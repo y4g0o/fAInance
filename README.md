@@ -76,7 +76,6 @@ cd web && npm test        # lógica pura do front
 
 ## Uso
 
-
 ```bash
 cd ~/lab/personalos
 uv venv .venv && uv pip install --python .venv/bin/python -e .   # setup

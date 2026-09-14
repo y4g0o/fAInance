@@ -26,7 +26,7 @@ def _tx(fit: str, dia: int, centavos: int, desc: str, cat=None):
 
 
 def test_padrao_comum_escolhe_a_palavra_que_identifica():
-    """Entre PIX, QRS e CLARO, a que identifica o gasto é a mais longa — sem precisar
+    """Entre PIX, QRS e TELECOMIX, a que identifica o gasto é a mais longa — sem precisar
     de lista de palavras genéricas, que envelhece mal."""
     assert _padrao_comum(["PIX QRS TELECOMIX05/08", "PIX QRS TELECOMIX12/07"]) == "telecomix"
     assert _padrao_comum(["INT /TRIBUTO-UF/GUIA 202646", "INT /TRIBUTO-UF/GUIA 202702"]) == "tributo"

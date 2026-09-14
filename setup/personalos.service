@@ -1,6 +1,6 @@
 [Unit]
 Description=PersonalOS — painel e API locais (somente loopback)
-Documentation=https://github.com/y4g0o/personalos
+Documentation=https://github.com/y4g0o/fAInance
 After=graphical-session.target
 
 [Service]

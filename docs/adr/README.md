@@ -25,4 +25,6 @@ reaberta, e evita tanto teimosia quanto reescrita por moda.
 | [0004](0004-convencao-de-sinal-nas-views.md) | Convenção de sinal nas views | Aceita |
 | [0005](0005-sem-graphrag.md) | Sem GraphRAG | Aceita |
 | [0006](0006-composition-root-fora-do-kernel.md) | Composition root fora do kernel | Aceita |
-| [0007](0007-painel-sem-javascript.md) | Painel sem JavaScript (SVG no servidor) | Aceita |
+| [0007](0007-painel-sem-javascript.md) | Painel sem JavaScript (SVG no servidor) | Substituída pela 0008 |
+| [0008](0008-spa-react-substitui-painel-sem-js.md) | SPA React substitui o painel sem JavaScript | Aceita |
+| [0009](0009-escrita-http-e-verificacao-de-origem.md) | Escrita via HTTP e verificação de origem | Aceita |

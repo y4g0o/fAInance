@@ -8,12 +8,14 @@ import { api } from '../../lib/api'
 import { formatar } from '../../lib/dinheiro'
 import { Categorizar } from './Categorizar'
 import { Conta } from './Conta'
+import { Importar } from './Importar'
 import { Lancar } from './Lancar'
 import './financas.css'
 
 type Saldo = { saldo_centavos: number }
 
 const ABAS = [
+  { id: 'importar', rotulo: 'Importar extrato' },
   { id: 'categorizar', rotulo: 'Categorizar' },
   { id: 'lancar', rotulo: 'Lançar' },
   { id: 'conta', rotulo: 'Saldo da conta' },
@@ -48,6 +50,7 @@ export function TelaFinancas() {
         ))}
       </div>
 
+      {aba === 'importar' && <Importar aoImportar={recarregarSaldo} />}
       {aba === 'categorizar' && <Categorizar />}
       {aba === 'lancar' && <Lancar aoLancar={recarregarSaldo} />}
       {aba === 'conta' && <Conta aoSalvar={recarregarSaldo} />}

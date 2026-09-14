@@ -95,3 +95,15 @@
 .campos button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .nota { font-size: 12px; color: var(--apagado); margin-top: 14px; max-width: 60ch; }
+
+.solta {
+  border: 2px dashed var(--linha); border-radius: 8px; padding: 34px 20px;
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  text-align: center; cursor: pointer; color: var(--apagado); background: var(--superficie);
+}
+.solta:hover, .solta:focus-visible { border-color: var(--entra); color: var(--texto-2); }
+.solta:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.solta.sobre { border-color: var(--entra); background: color-mix(in srgb, var(--entra) 10%, var(--superficie)); }
+.solta strong { color: var(--texto); font-size: 16px; }
+.solta span { font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) { .solta { transition: border-color 150ms ease, background 150ms ease; } }

@@ -1,6 +1,6 @@
 # ADR 0007 — Painel sem JavaScript (SVG no servidor, formulário HTML)
 
-**Data:** 2026-08-06 · **Estado:** Aceita · **Substitui:** decisão de Chart.js + HTMX
+**Data:** 2026-08-06 · **Estado:** SUBSTITUÍDA pela [ADR 0008](0008-spa-react-substitui-painel-sem-js.md) · **Substitui:** decisão de Chart.js + HTMX
 da spec do v0.2
 
 ## Contexto
