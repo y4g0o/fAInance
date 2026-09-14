@@ -1,0 +1,10 @@
+.venv/
+uv.lock
+db/*.db
+extratos/*
+!extratos/.gitkeep
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+web/node_modules/

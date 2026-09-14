@@ -1,0 +1,56 @@
+/**
+ * Telas de finanças. Esta pasta PODE saber tudo sobre dinheiro — é a moldura que
+ * não pode.
+ */
+import { useCallback, useEffect, useState } from 'react'
+
+import { api } from '../../lib/api'
+import { formatar } from '../../lib/dinheiro'
+import { Categorizar } from './Categorizar'
+import { Conta } from './Conta'
+import { Lancar } from './Lancar'
+import './financas.css'
+
+type Saldo = { saldo_centavos: number }
+
+const ABAS = [
+  { id: 'categorizar', rotulo: 'Categorizar' },
+  { id: 'lancar', rotulo: 'Lançar' },
+  { id: 'conta', rotulo: 'Saldo da conta' },
+] as const
+
+export function TelaFinancas() {
+  const [saldo, setSaldo] = useState<Saldo | null>(null)
+  const [aba, setAba] = useState<string>('categorizar')
+
+  const recarregarSaldo = useCallback(() => {
+    api.get<Saldo>('/api/financas/saldo').then(setSaldo).catch(() => setSaldo(null))
+  }, [])
+
+  useEffect(recarregarSaldo, [recarregarSaldo])
+
+  return (
+    <>
+      {/* Sem dado é sem dado: nada de zero fingindo saldo. */}
+      <p className="dinheiro saldo">
+        {saldo ? (
+          formatar(saldo.saldo_centavos)
+        ) : (
+          <span className="indisponivel">saldo indisponível</span>
+        )}
+      </p>
+
+      <div className="abas">
+        {ABAS.map((a) => (
+          <button key={a.id} onClick={() => setAba(a.id)} aria-current={aba === a.id ? 'page' : undefined}>
+            {a.rotulo}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'categorizar' && <Categorizar />}
+      {aba === 'lancar' && <Lancar aoLancar={recarregarSaldo} />}
+      {aba === 'conta' && <Conta aoSalvar={recarregarSaldo} />}
+    </>
+  )
+}

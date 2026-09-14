@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block conteudo %}
+
+{% if ctx.primeiro_uso %}
+  <section id="secao-primeiro-uso" class="aviso">
+    {% for card in ctx.cards %}{% if card.aviso %}<p>{{ card.aviso }}</p>{% endif %}{% endfor %}
+  </section>
+{% else %}
+
+<section id="secao-resumo">
+  {% for card in ctx.cards %}
+    <article class="card">
+      <h2>{{ card.titulo }}</h2>
+      {% if card.vazio %}
+        <p class="aviso">{{ card.aviso }}</p>
+      {% else %}
+        <dl>
+          {% for m in card.metricas %}
+            <div class="metrica tom-{{ m.tom }}">
+              <dt>{{ m.rotulo }}</dt>
+              <dd>{{ m.valor }}</dd>
+              {% if m.detalhe %}<small>{{ m.detalhe }}</small>{% endif %}
+            </div>
+          {% endfor %}
+        </dl>
+      {% endif %}
+    </article>
+  {% endfor %}
+</section>
+
+{% if ctx.tem_grafico %}
+<section id="secao-graficos">
+  <h2>Fluxo mensal</h2>
+  {{ grafico | safe }}
+  <p class="legenda">
+    <span class="amostra receitas"></span> receitas
+    <span class="amostra despesas"></span> despesas
+  </p>
+</section>
+{% endif %}
+
+{% endif %}
+
+<section id="secao-pergunta">
+  <h2>Perguntar</h2>
+  <form method="post" action="/painel/perguntar">
+    <input type="text" name="texto" placeholder="quanto gastei em julho?"
+           aria-label="pergunta" {% if not ctx.chat_disponivel %}disabled{% endif %}>
+    <button type="submit" {% if not ctx.chat_disponivel %}disabled{% endif %}>Perguntar</button>
+  </form>
+  {% if not ctx.chat_disponivel %}
+    <p class="aviso">Consultor em linguagem natural ainda não configurado.</p>
+  {% endif %}
+  {% if resposta %}<p class="resposta">{{ resposta }}</p>{% endif %}
+</section>
+
+{% if ctx.tem_insights %}
+<section id="secao-insights">
+  <h2>Insights</h2>
+  <ul id="lista-insights">
+    {% for i in ctx.insights %}
+      <li class="sev-{{ i.severidade }}">
+        <span>{{ i.titulo }}</span>
+        <form method="post" action="/painel/insights/{{ i.id }}/dispensar">
+          <button type="submit">dispensar</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% endblock %}

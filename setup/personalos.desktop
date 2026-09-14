@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PersonalOS
+Comment=Suas finanças, local e só na sua máquina
+Exec=xdg-open http://127.0.0.1:8000/app/
+Icon=personalos
+Terminal=false
+Categories=Office;Finance;
+Keywords=financas;dinheiro;personalos;

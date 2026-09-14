@@ -1,0 +1,97 @@
+/* Telas de finanças. Densidade alta e números tabulares: dinheiro em coluna só
+   se compara quando os dígitos alinham. */
+.grupos { width: 100%; border-collapse: collapse; }
+
+.grupos th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--apagado);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--linha);
+}
+
+.grupos td { padding: 10px 12px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+.grupos .num { text-align: right; }
+.grupos tr[data-aplicado='sim'] { background: color-mix(in srgb, var(--entra) 8%, transparent); }
+
+.exemplo { font-size: 12px; color: var(--apagado); }
+
+.grupos input[type='text'],
+.grupos input:not([type]) {
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  color: var(--texto);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font: inherit;
+  width: 160px;
+}
+
+.regra { display: block; font-size: 12px; color: var(--apagado); margin-top: 6px; }
+.falhou { font-size: 12px; color: var(--sai); margin-top: 6px; }
+.ok { color: var(--entra); }
+.pendente { color: var(--apagado); }
+
+.grupos button,
+.desfazer button {
+  background: var(--superficie-2);
+  border: 1px solid var(--linha);
+  color: var(--texto);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.grupos button:hover, .desfazer button:hover { border-color: var(--entra); color: var(--entra); }
+.grupos button:focus-visible, .desfazer button:focus-visible { outline: 2px solid var(--foco); }
+
+.desfazer {
+  position: sticky;
+  bottom: 16px;
+  margin-top: 20px;
+  background: var(--superficie);
+  border: 1px solid var(--linha);
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--texto-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .grupos tr { transition: background 150ms ease; }
+}
+
+.saldo { font-size: 26px; font-weight: 600; margin: 0 0 18px; }
+.indisponivel { color: var(--apagado); font-size: 15px; font-weight: 400; }
+
+.abas { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--linha); }
+.abas button {
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--apagado); font: inherit; padding: 8px 12px; cursor: pointer;
+}
+.abas button:hover { color: var(--texto); }
+.abas button[aria-current='page'] { color: var(--texto); border-bottom-color: var(--entra); }
+.abas button:focus-visible { outline: 2px solid var(--foco); outline-offset: -2px; }
+
+.formulario { max-width: 760px; }
+.campos { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.campos label { display: flex; flex-direction: column; gap: 5px; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--apagado); }
+.campos input, .campos select {
+  background: var(--fundo); border: 1px solid var(--linha); color: var(--texto);
+  border-radius: 4px; padding: 7px 9px; font: 15px/1.4 inherit; min-width: 130px;
+}
+.campos input:focus-visible, .campos select:focus-visible { outline: 2px solid var(--foco); }
+.campos button {
+  background: var(--superficie-2); border: 1px solid var(--linha); color: var(--texto);
+  border-radius: 4px; padding: 8px 16px; font: inherit; cursor: pointer;
+}
+.campos button:hover:not(:disabled) { border-color: var(--entra); color: var(--entra); }
+.campos button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.nota { font-size: 12px; color: var(--apagado); margin-top: 14px; max-width: 60ch; }

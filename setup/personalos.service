@@ -1,0 +1,31 @@
+[Unit]
+Description=PersonalOS — painel e API locais (somente loopback)
+Documentation=https://github.com/y4g0o/personalos
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/personalos/.venv/bin/personalos servir
+Restart=on-failure
+RestartSec=5
+
+# --- isolamento ---
+# Unidade de USUÁRIO: roda como você, nunca como root.
+NoNewPrivileges=yes
+PrivateTmp=yes
+# Sistema de arquivos somente leitura, com exceção explícita para os dados do
+# PersonalOS. Se um dia o programa tentar escrever fora daqui, ele falha em vez
+# de conseguir.
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/personalos
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Só rede local: nada de IPv6 externo, nada de sockets exóticos.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=default.target
