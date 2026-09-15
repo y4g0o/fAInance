@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import date
 
@@ -20,9 +21,31 @@ from personalos.modulos.financas.dominio.dinheiro import Dinheiro
 CATEGORIAS_NAO_CONSUMO = ("Transferência", "Investimento")
 
 
-def e_consumo(categoria: str | None) -> bool:
-    """Se a transação representa consumo de verdade (e não movimentação própria)."""
-    return categoria not in CATEGORIAS_NAO_CONSUMO
+def e_consumo(
+    categoria: str | None,
+    nao_consumo: Collection[str] | Mapping[str, date | None] = (),
+    quando: date | None = None,
+) -> bool:
+    """Se a transação representa consumo de verdade (e não movimentação própria).
+
+    `nao_consumo` são as categorias que o USUÁRIO declarou como movimentação. A
+    lista fixa acima é só o padrão: o nome que o banco dá para transferência
+    própria varia ("Conta de uso", "Movimentação"), e o código não tem como
+    adivinhar. Quem sabe o que cada categoria significa é quem vive com elas.
+
+    Cada declaração pode ter **data de início**, e ela existe por um caso real:
+    a transferência para outra conta só deixa de ser gasto no mês em que essa
+    conta passa a ser importada. Antes disso a transferência é a única pista do
+    gasto, e neutralizá-la apagaria despesa de verdade do histórico.
+    """
+    if categoria in CATEGORIAS_NAO_CONSUMO:
+        return False
+    if categoria is None or categoria not in nao_consumo:
+        return True
+    inicio = nao_consumo.get(categoria) if isinstance(nao_consumo, Mapping) else None
+    if inicio is None:
+        return False
+    return quando is not None and quando < inicio
 
 
 @dataclass(frozen=True, slots=True)

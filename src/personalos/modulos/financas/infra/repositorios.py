@@ -143,6 +143,20 @@ class RepoContasSQL:
         with self._engine.begin() as conn:
             conn.execute(stmt)
 
+    def garantir(self, nome: str) -> None:
+        """Cria a conta com saldo inicial zero se ela ainda não existir.
+
+        Serve para conta que existe só pelo que o usuário registra (dinheiro
+        vivo, carteira): o ponto de partida dela É zero. Nunca sobrescreve saldo
+        já declarado — por isso não é `definir_saldo_inicial(nome, 0)`.
+        """
+        with self._engine.begin() as conn:
+            conn.execute(
+                sqlite_insert(t_contas)
+                .values(nome=nome, saldo_inicial_centavos=0)
+                .on_conflict_do_nothing(index_elements=["nome"])
+            )
+
     def listar(self) -> list[tuple[str, Dinheiro]]:
         with self._engine.connect() as conn:
             return [

@@ -180,3 +180,22 @@ def test_desfazer_lote_volta_categorias_e_remove_a_regra_criada(repo_transacoes,
 
     assert all(t.categoria is None for t in repo_transacoes.listar())
     assert [r.padrao for r in repo_regras.listar()] == []
+
+
+def test_renomear_categoria_junta_as_variantes(repo_transacoes, repo_regras):
+    """'compras' e 'Compras' viram fatias separadas do mesmo gasto no relatório.
+    Aconteceu de verdade: o campo é texto livre e não mostra o que já existe."""
+    repo_transacoes.inserir_muitas(
+        [
+            _tx_simples("a1", "LOJA UM", categoria="compras"),
+            _tx_simples("a2", "LOJA DOIS", categoria="Compras"),
+            _tx_simples("b1", "OUTRA COISA", categoria="Telefonia"),
+        ]
+    )
+
+    mudadas = escrita.renomear_categoria(repo_transacoes, de="compras", para="Compras")
+
+    assert mudadas == 1
+    por_categoria = {t.fit_id: t.categoria for t in repo_transacoes.listar()}
+    assert por_categoria["a1"] == "Compras"
+    assert por_categoria["b1"] == "Telefonia"

@@ -6,13 +6,16 @@ from personalos.modulos.financas.analytics.vistas import VISTAS
 from personalos.modulos.financas.aplicacao.resumo import resumo
 from personalos.modulos.financas.dominio.dinheiro import Dinheiro
 from personalos.modulos.financas.dominio.modelos import Transacao
-from personalos.modulos.financas.infra.repositorios import RepoTransacoesSQL
+from personalos.modulos.financas.infra.repositorios import RepoContasSQL, RepoTransacoesSQL
 from personalos.modulos.financas.infra.tabelas import metadata as metadata_financas
 from personalos.nucleo.db import criar_engine
 
 
-def _engine(tmp_path: Path, transacoes=()):
+def _engine(tmp_path: Path, transacoes=(), conta_declarada: str | None = "conta"):
     engine = criar_engine(tmp_path / "t.db", metadatas=(metadata_financas,), vistas=VISTAS)
+    # Saldo só conta conta com ponto de partida declarado (ver vistas.py).
+    if conta_declarada:
+        RepoContasSQL(engine).definir_saldo_inicial(conta_declarada, Dinheiro(0))
     if transacoes:
         RepoTransacoesSQL(engine).inserir_muitas(list(transacoes))
     return engine

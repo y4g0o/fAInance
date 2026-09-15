@@ -22,7 +22,6 @@ from personalos.modulos.financas.infra.repositorios import (
     RepoTransacoesSQL,
 )
 from personalos.modulos.financas.infra.tabelas import metadata as _metadata_financas
-from personalos.nucleo import insights as motor_insights
 from personalos.nucleo import memoria
 from personalos.nucleo.config import caminho_banco
 from personalos.nucleo.db import criar_engine
@@ -83,16 +82,12 @@ def importar(
     # (sem EventBus — o gatilho documentado para criá-lo é o 2º par publicador/assinante).
     if novas:
         # Import local: modulo.py importa este cli.py, então importar o manifesto no
-        # topo fecharia o ciclo. Em tempo de execução o módulo já está carregado.
-        from personalos.modulos.financas.modulo import MODULO
-
         engine = criar_engine(
             db_resolvido, metadatas=(_metadata_financas,), vistas=_vistas_financas
         )
-        insights_financas.aprender_gastos_fixos(engine)
-        resultado = motor_insights.gerar(engine, (MODULO,))
-        if resultado.novos:
-            typer.echo(f"{resultado.novos} insight(s) novo(s) — veja com `personalos insights listar`.")
+        novos = escrita.reprocessar_insights(engine)
+        if novos:
+            typer.echo(f"{novos} insight(s) novo(s) — veja com `personalos insights listar`.")
 
 
 @app.command()
@@ -132,7 +127,8 @@ def categorias(
     db_resolvido = db or caminho_banco()
     repo_tx, _ = _repos(db_resolvido)
     inicio, fim = _periodo(mes, ano)
-    for nome, total in consultas.gastos_por_categoria(repo_tx, inicio, fim):
+    nao_consumo = escrita.categorias_nao_consumo(_engine_financas(db))
+    for nome, total in consultas.gastos_por_categoria(repo_tx, inicio, fim, nao_consumo):
         typer.echo(f"{total.formatar():>14}  {nome}")
 
 
@@ -354,6 +350,27 @@ def fixos(
         )
 
 
+@app.command("renomear-categoria")
+def renomear_categoria_cmd(
+    de: str,
+    para: str,
+    db: Path | None = typer.Option(None, "--db"),
+) -> None:
+    """Junta variantes de categoria: 'compras' e 'Compras' viram uma só.
+
+    A comparação é exata: o sistema não presume que maiúscula e minúscula são a
+    mesma palavra — em nome próprio nem sempre são. Quem decide é você.
+    """
+    db_resolvido = db or caminho_banco()
+    repo_tx, _ = _repos(db_resolvido)
+    try:
+        mudadas = escrita.renomear_categoria(repo_tx, de=de, para=para)
+    except ValueError as e:
+        typer.echo(f"Erro: {e}")
+        raise typer.Exit(1) from e
+    typer.echo(f"{mudadas} transação(ões) movida(s) de '{de}' para '{para}'.")
+
+
 @app.command("esquecer-fixo")
 def esquecer_fixo(
     chave: str,
@@ -362,11 +379,13 @@ def esquecer_fixo(
     """Esquece um gasto fixo detectado errado (use a chave normalizada de `fixos`)."""
     db_resolvido = db or caminho_banco()
     engine = criar_engine(db_resolvido, metadatas=(_metadata_financas,), vistas=_vistas_financas)
-    if memoria.remover(engine, insights_financas.MODULO, insights_financas.TIPO_FATO, chave):
-        typer.echo(f"Esquecido: {chave}")
+    # Mesmo quando a chave ainda não foi aprendida, o "não é fixo" é registrado:
+    # serve para marcar de antemão algo que você sabe que vai ser detectado errado.
+    # Dizer "não existia" e sair com erro esconderia que a decisão foi guardada.
+    if insights_financas.esquecer_fixo(engine, chave):
+        typer.echo(f"Esquecido: {chave} (não volta a ser aprendido)")
     else:
-        typer.echo(f"Não existia gasto fixo com chave {chave!r}")
-        raise typer.Exit(1)
+        typer.echo(f"{chave!r} não estava na lista, mas fica marcado para não ser aprendido.")
 
 
 @app.command()
@@ -395,6 +414,7 @@ def lancar(
         resultado = escrita.lancar(
             repo_tx,
             repo_regras,
+            RepoContasSQL(_engine_financas(db)),
             descricao=descricao,
             valor=valor,
             tipo=tipo,

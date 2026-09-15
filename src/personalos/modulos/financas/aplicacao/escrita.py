@@ -41,6 +41,7 @@ def fit_id_manual(quando: date, centavos: int, descricao: str, conta: str) -> st
 def lancar(
     repo_tx: RepoTransacoes,
     repo_regras: RepoRegras,
+    repo_contas: object = None,
     *,
     descricao: str,
     valor: str,
@@ -66,6 +67,11 @@ def lancar(
     )
     if transacao.categoria is None:
         transacao = replace(transacao, categoria=categorizar(transacao, repo_regras.listar()))
+    # Conta que existe só pelo que você registra começa em zero — sem isto, o
+    # lançamento manual não aparece no saldo, porque o saldo só considera conta
+    # com ponto de partida declarado.
+    if repo_contas is not None:
+        repo_contas.garantir(conta)  # type: ignore[attr-defined]
     inseridas = repo_tx.inserir_muitas([transacao])
     return ResultadoLancamento(transacao=transacao, inserida=inseridas == 1)
 
@@ -154,3 +160,75 @@ def desfazer_lote(
     if padrao_da_regra:
         repo_regras.remover(padrao_da_regra, tipo)
     return voltaram
+
+
+def reprocessar_insights(engine: object) -> int:
+    """Reaprende gastos fixos e gera insights. Devolve quantos são novos.
+
+    Existe como função porque tanto a CLI quanto a tela precisam rodar isto ao
+    fim de uma importação: um caminho que importa sem reprocessar deixa o usuário
+    sem alerta e sem como perceber que parou de receber.
+
+    Importes locais: o manifesto do módulo importa a CLI, e citá-lo no topo
+    fecharia o ciclo.
+    """
+    from personalos.modulos.financas import insights as insights_financas
+    from personalos.modulos.financas.modulo import MODULO
+    from personalos.nucleo import insights as motor_insights
+
+    insights_financas.aprender_gastos_fixos(engine)  # type: ignore[arg-type]
+    return motor_insights.gerar(engine, (MODULO,)).novos  # type: ignore[arg-type]
+
+
+def renomear_categoria(repo_tx: RepoTransacoes, *, de: str, para: str) -> int:
+    """Renomeia uma categoria em todas as transações. Devolve quantas mudaram.
+
+    Serve para juntar variantes: 'compras' e 'Compras' são a mesma coisa para o
+    humano e duas fatias diferentes no relatório. A comparação é exata — o que
+    corrige a variação de caixa é o chamador dizer qual vira qual, não o sistema
+    adivinhar que maiúscula e minúscula são a mesma palavra (em nome próprio,
+    às vezes não são).
+    """
+    if not de.strip() or not para.strip():
+        raise ValueError("as duas categorias precisam de nome")
+    alvos = [t.fit_id for t in repo_tx.listar() if t.categoria == de]
+    return repo_tx.definir_categoria(alvos, para)
+
+
+TIPO_NAO_CONSUMO = "categoria_nao_consumo"
+
+
+def declarar_nao_consumo(
+    engine: object,
+    categoria: str,
+    *,
+    e_movimentacao: bool = True,
+    a_partir_de: date | None = None,
+) -> None:
+    """Declara que uma categoria MOVE dinheiro em vez de consumi-lo.
+
+    Fica guardado porque é conhecimento do usuário sobre a própria vida: só ele
+    sabe se "Conta de uso" é transferência entre contas dele ou gasto de verdade.
+    Declarar errado ESCONDE gasto, então é decisão explícita, nunca inferência.
+    """
+    from personalos.modulos.financas.insights import MODULO
+    from personalos.nucleo import memoria
+
+    if e_movimentacao:
+        memoria.definir(engine, MODULO, TIPO_NAO_CONSUMO, categoria,  # type: ignore[arg-type]
+                        {"motivo": "declarado pelo usuário",
+                         "a_partir_de": a_partir_de.isoformat() if a_partir_de else None})
+    else:
+        memoria.remover(engine, MODULO, TIPO_NAO_CONSUMO, categoria)  # type: ignore[arg-type]
+
+
+def categorias_nao_consumo(engine: object) -> dict[str, date | None]:
+    """Categorias declaradas como movimentação, e desde quando (None = sempre)."""
+    from personalos.modulos.financas.insights import MODULO
+    from personalos.nucleo import memoria
+
+    resultado: dict[str, date | None] = {}
+    for f in memoria.listar(engine, MODULO, TIPO_NAO_CONSUMO):  # type: ignore[arg-type]
+        bruto = f.valor.get("a_partir_de") if isinstance(f.valor, dict) else None
+        resultado[f.chave] = date.fromisoformat(bruto) if isinstance(bruto, str) else None
+    return resultado

@@ -20,6 +20,7 @@ import numpy_financial as npf
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from personalos.modulos.financas.aplicacao.escrita import categorias_nao_consumo
 from personalos.modulos.financas.dominio.modelos import e_consumo
 from personalos.modulos.financas.insights import (
     gastos_fixos_conhecidos,
@@ -40,17 +41,27 @@ class MesDespesas:
     receita_centavos: int
 
 
+
+def _data_da(linha: object) -> date | None:
+    """A data da linha, venha ela como texto (SQL) ou já tipada."""
+    bruto = getattr(linha, "data", None)
+    if isinstance(bruto, date):
+        return bruto
+    return date.fromisoformat(str(bruto)) if bruto else None
+
+
 def _por_mes(engine: Engine, hoje: date | None = None) -> list[MesDespesas]:
     """Agrega por mês, separando o que é gasto fixo do que é variável.
 
     Exclui o mês corrente: um mês pela metade puxaria toda mediana para baixo.
     """
+    nao_consumo = categorias_nao_consumo(engine)
     chaves_fixas = {f.chave for f in gastos_fixos_conhecidos(engine)}
     with engine.connect() as conn:
         linhas = list(
             conn.execute(
                 text(
-                    "SELECT strftime('%Y-%m', data) AS mes, descricao, valor_centavos, "
+                    "SELECT strftime('%Y-%m', data) AS mes, data, descricao, valor_centavos, "
                     "categoria FROM financas_transacoes ORDER BY data, fit_id"
                 )
             )
@@ -65,7 +76,7 @@ def _por_mes(engine: Engine, hoje: date | None = None) -> list[MesDespesas]:
         meses.add(mes)
         if linha.valor_centavos > 0:
             receita[mes] += linha.valor_centavos
-        elif not e_consumo(linha.categoria):
+        elif not e_consumo(linha.categoria, nao_consumo, _data_da(linha)):
             continue  # transferência própria e aplicação não são custo de vida
         elif normalizar_descricao(linha.descricao) in chaves_fixas:
             fixo[mes] += -linha.valor_centavos
@@ -129,6 +140,7 @@ def onde_cortar(engine: Engine, limite: int = 5, hoje: date | None = None) -> li
     Não julga o que é essencial: devolve os fatos ordenados. A conversa sobre "isso
     eu não posso cortar" é sua, não do algoritmo.
     """
+    nao_consumo = categorias_nao_consumo(engine)
     candidatos = [
         Corte(f.descricao_exemplo, "fixo", f.valor_mediano_centavos, f.valor_mediano_centavos * 12)
         for f in gastos_fixos_conhecidos(engine)
@@ -139,7 +151,7 @@ def onde_cortar(engine: Engine, limite: int = 5, hoje: date | None = None) -> li
         linhas = list(
             conn.execute(
                 text(
-                    "SELECT strftime('%Y-%m', data) AS mes, "
+                    "SELECT strftime('%Y-%m', data) AS mes, data, "
                     "COALESCE(categoria, 'Sem categoria') AS categoria, "
                     "descricao, valor_centavos FROM financas_transacoes "
                     "WHERE valor_centavos < 0 ORDER BY data, fit_id"
@@ -151,7 +163,7 @@ def onde_cortar(engine: Engine, limite: int = 5, hoje: date | None = None) -> li
     for linha in linhas:
         if (
             str(linha.mes) == corrente
-            or not e_consumo(linha.categoria)
+            or not e_consumo(linha.categoria, nao_consumo, _data_da(linha))
             or normalizar_descricao(linha.descricao) in chaves_fixas
         ):
             continue  # mês incompleto distorce; não-consumo não é corte; fixo já entrou
@@ -263,6 +275,7 @@ def projecao_fim_do_mes(engine: Engine, hoje: date | None = None) -> Projecao | 
     Devolve None se o mês corrente não tem movimento nenhum — projetar do nada seria
     inventar número.
     """
+    nao_consumo = categorias_nao_consumo(engine)
     referencia = hoje or date.today()
     mes = referencia.strftime("%Y-%m")
     chaves_fixas = {f.chave: f for f in gastos_fixos_conhecidos(engine)}
@@ -283,7 +296,7 @@ def projecao_fim_do_mes(engine: Engine, hoje: date | None = None) -> Projecao | 
     gasto = sum(
         -linha.valor_centavos
         for linha in linhas
-        if linha.valor_centavos < 0 and e_consumo(linha.categoria)
+        if linha.valor_centavos < 0 and e_consumo(linha.categoria, nao_consumo, _data_da(linha))
     )
     vistos = {normalizar_descricao(linha.descricao) for linha in linhas}
     pendentes = sum(

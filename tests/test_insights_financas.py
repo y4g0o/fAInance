@@ -289,3 +289,27 @@ def test_fixo_aprendido_guarda_descricao_limpa(tmp_path):
     engine = _engine(tmp_path, _netflix([6, 7, 8]))
     fixos = aprender_gastos_fixos(engine, HOJE)
     assert fixos[0].descricao_exemplo == "NETFLIX.COM"
+
+
+def test_gasto_fixo_esquecido_nao_volta_no_proximo_aprendizado(tmp_path):
+    """`esquecer-fixo` só apagava a linha da memória — e o aprendizado seguinte,
+    que roda em todo importar, reaprendia na hora. A correção do usuário durava
+    até o próximo extrato, sem ele perceber.
+
+    Descoberto em uso real: uma compra recorrente de marketplace foi aprendida
+    como gasto fixo, o usuário mandou esquecer, e ela reapareceu na listagem
+    seguinte.
+    """
+    from personalos.modulos.financas.insights import esquecer_fixo
+
+    engine = _engine(
+        tmp_path,
+        [_despesa(f"c{m}", 2026, m, 10, 5000, f"PIX QRS LOJA ONLINE {m:02d}/26") for m in (4, 5, 6)],
+    )
+    aprendidos = aprender_gastos_fixos(engine, hoje=HOJE)
+    assert any("loja online" in f.chave for f in aprendidos)
+
+    esquecer_fixo(engine, "pix qrs loja online")
+    de_novo = aprender_gastos_fixos(engine, hoje=HOJE)
+
+    assert not any("loja online" in f.chave for f in de_novo), "o gasto esquecido voltou"

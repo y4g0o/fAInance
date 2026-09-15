@@ -12,7 +12,8 @@ só mostra onde está o volume.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+import unicodedata
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from sqlalchemy import text
@@ -37,7 +38,33 @@ class SugestaoRegra:
     alcance: int           # transações que o padrão pegaria, inclusive já categorizadas
 
 
-def _padrao_comum(descricoes: list[str]) -> str | None:
+# Palavra presente em mais que esta fração das descrições não identifica nada
+# NESTE extrato — e cada banco tem o seu vocabulário de enchimento.
+FRACAO_BANAL = 0.25
+MINIMO_PARA_MEDIR_BANALIDADE = 20
+
+
+def palavras_banais(descricoes: list[str], fracao: float = FRACAO_BANAL) -> frozenset[str]:
+    """Palavras comuns demais para servirem de padrão, medidas no próprio dado.
+
+    Lista fixa não resolve: ela acerta o banco que se conhecia quando foi escrita
+    e erra o próximo. O Nubank escreve "Transferência enviada pelo Pix - NOME" em
+    centenas de linhas, e sem isto o padrão sugerido para todos os grupos virava
+    "transferência" — uma regra que pegaria tudo.
+    """
+    # Em conjunto pequeno, palavra repetida É o padrão — não há como distinguir
+    # enchimento de identidade com cinco linhas. O filtro só liga quando há dado
+    # suficiente para a frequência significar alguma coisa.
+    if len(descricoes) < MINIMO_PARA_MEDIR_BANALIDADE:
+        return frozenset()
+    contagem: Counter[str] = Counter()
+    for descricao in descricoes:
+        contagem.update({_sem_acento(p) for p in _PALAVRA.findall(descricao)})
+    corte = max(5, int(len(descricoes) * fracao))
+    return frozenset(palavra for palavra, n in contagem.items() if n >= corte)
+
+
+def _padrao_comum(descricoes: list[str], banais: frozenset[str] = frozenset()) -> str | None:
     """Palavra mais longa presente em TODAS as descrições do grupo.
 
     O comprimento é um proxy simples de distintividade: entre "PIX", "QRS" e
@@ -49,7 +76,8 @@ def _padrao_comum(descricoes: list[str]) -> str | None:
     sugestão mudar entre execuções sobre os mesmos dados.
     """
     conjuntos = [
-        {p.lower() for p in _PALAVRA.findall(descricao)} for descricao in descricoes
+        {p.lower() for p in _PALAVRA.findall(descricao) if _sem_acento(p) not in banais}
+        for descricao in descricoes
     ]
     if not conjuntos:
         return None
@@ -75,6 +103,7 @@ def sugerir_regras(
                 )
             )
         )
+    banais = palavras_banais([str(linha.descricao) for linha in linhas])
     grupos: dict[str, list[tuple[str, int]]] = defaultdict(list)
     todas: list[str] = []
     for linha in linhas:
@@ -88,7 +117,7 @@ def sugerir_regras(
     for _chave, itens in grupos.items():
         if len(itens) < minimo_de_ocorrencias:
             continue
-        padrao = _padrao_comum([descricao for descricao, _ in itens])
+        padrao = _padrao_comum([descricao for descricao, _ in itens], banais)
         if padrao is None:
             continue
         sugestoes.append(
@@ -135,3 +164,87 @@ def recategorizar(engine: Engine, reaplicar_tudo: bool = False) -> int:
             )
             mudadas += 1
     return mudadas
+
+
+@dataclass(frozen=True)
+class SugestaoCategoria:
+    categoria: str
+    palavra: str      # a palavra que casou — é a justificativa da sugestão
+    transacoes: int   # em quantas transações já categorizadas ela aparece
+
+
+# Uma transação é coincidência; duas começam a ser padrão. Mesmo limiar do agrupador.
+MINIMO_PARA_SUGERIR = 2
+
+# Palavras que aparecem em quase toda descrição de extrato e não identificam nada.
+_GENERICAS = frozenset({
+    "compra", "debito", "credito", "pagamento", "pix", "qrs", "transf",
+    "transferencia", "conta", "cartao", "fatura", "para", "pelo", "pela",
+})
+
+
+def _sem_acento(palavra: str) -> str:
+    """Compara palavra ignorando acento.
+
+    Falha real: a lista de genéricas tinha 'debito' e o extrato escreve 'débito',
+    então a palavra que aparece em TODA descrição passou a ser a mais distintiva
+    — e o sistema sugeriu Delivery para supermercado.
+    """
+    return "".join(
+        c for c in unicodedata.normalize("NFD", palavra.lower())
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def sugerir_categoria(engine: Engine, descricao: str) -> SugestaoCategoria | None:
+    """Sugere categoria a partir do que o usuário JÁ categorizou.
+
+    Não é palpite: a sugestão só existe se alguma palavra distintiva da descrição
+    aparecer em transações que ele mesmo classificou. Devolve a palavra e a
+    contagem porque sugestão sem justificativa é adivinhação com cara de
+    autoridade — e aqui quem decide continua sendo ele.
+
+    Sem precedente, devolve None. Campo vazio é melhor que sugestão inventada.
+
+    Duas exigências que vieram de sugestões ruins observadas nos dados reais:
+    ao menos DUAS transações sustentando (uma é coincidência, não padrão), e
+    nunca sugerir categoria declarada como movimentação — sugerir "Conta de uso"
+    para uma compra é sugerir que ela não é gasto, e o usuário aceitaria sem ver.
+    """
+    from personalos.modulos.financas.aplicacao.escrita import categorias_nao_consumo
+    from personalos.modulos.financas.dominio.modelos import e_consumo
+
+    nao_consumo = categorias_nao_consumo(engine)
+    palavras = {
+        p.lower() for p in _PALAVRA.findall(descricao)
+        if len(p) >= 4 and _sem_acento(p) not in _GENERICAS
+    }
+    if not palavras:
+        return None
+
+    with engine.connect() as conn:
+        linhas = conn.execute(
+            text(
+                "SELECT descricao, categoria FROM financas_transacoes "
+                "WHERE categoria IS NOT NULL AND categoria <> ''"
+            )
+        ).all()
+
+    placar: dict[tuple[str, str], int] = defaultdict(int)
+    for linha in linhas:
+        if not e_consumo(str(linha.categoria), nao_consumo):
+            continue
+        presentes = {_sem_acento(p) for p in _PALAVRA.findall(str(linha.descricao))}
+        for palavra in {p for p in palavras if _sem_acento(p) in presentes}:
+            placar[(str(linha.categoria), palavra)] += 1
+
+    if not placar:
+        return None
+    # Mais transações ganha; empate resolve pela palavra mais longa (mais
+    # distintiva) e depois alfabeticamente, para a sugestão não mudar entre execuções.
+    (categoria, palavra), quantas = max(
+        placar.items(), key=lambda kv: (kv[1], len(kv[0][1]), kv[0][1])
+    )
+    if quantas < MINIMO_PARA_SUGERIR:
+        return None
+    return SugestaoCategoria(categoria=categoria, palavra=palavra, transacoes=quantas)

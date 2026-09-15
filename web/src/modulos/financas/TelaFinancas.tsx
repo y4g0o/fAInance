@@ -7,14 +7,24 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { formatar } from '../../lib/dinheiro'
 import { Categorizar } from './Categorizar'
+import { Analise } from './Analise'
+import { Comprar } from './Comprar'
 import { Conta } from './Conta'
+import { Fluxo } from './Fluxo'
+import { Fixos } from './Fixos'
 import { Importar } from './Importar'
 import { Lancar } from './Lancar'
+import { Resumo } from './Resumo'
 import './financas.css'
 
 type Saldo = { saldo_centavos: number }
 
 const ABAS = [
+  { id: 'resumo', rotulo: 'Resumo' },
+  { id: 'analise', rotulo: 'Onde vai o dinheiro' },
+  { id: 'fluxo', rotulo: 'Fluxo mensal' },
+  { id: 'comprar', rotulo: 'Posso comprar?' },
+  { id: 'fixos', rotulo: 'Gastos fixos' },
   { id: 'importar', rotulo: 'Importar extrato' },
   { id: 'categorizar', rotulo: 'Categorizar' },
   { id: 'lancar', rotulo: 'Lançar' },
@@ -23,7 +33,7 @@ const ABAS = [
 
 export function TelaFinancas() {
   const [saldo, setSaldo] = useState<Saldo | null>(null)
-  const [aba, setAba] = useState<string>('categorizar')
+  const [aba, setAba] = useState<string>('resumo')
 
   const recarregarSaldo = useCallback(() => {
     api.get<Saldo>('/api/financas/saldo').then(setSaldo).catch(() => setSaldo(null))
@@ -50,6 +60,11 @@ export function TelaFinancas() {
         ))}
       </div>
 
+      {aba === 'resumo' && <Resumo />}
+      {aba === 'analise' && <Analise />}
+      {aba === 'fluxo' && <Fluxo />}
+      {aba === 'comprar' && <Comprar />}
+      {aba === 'fixos' && <Fixos />}
       {aba === 'importar' && <Importar aoImportar={recarregarSaldo} />}
       {aba === 'categorizar' && <Categorizar />}
       {aba === 'lancar' && <Lancar aoLancar={recarregarSaldo} />}

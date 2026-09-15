@@ -31,7 +31,8 @@ VISTAS: tuple[Vista, ...] = (
         "vw_financas_saldo_v1",
         """
         SELECT
-            (SELECT COALESCE(SUM(valor_centavos), 0) FROM financas_transacoes) +
+            (SELECT COALESCE(SUM(valor_centavos), 0) FROM financas_transacoes
+                WHERE conta IN (SELECT nome FROM financas_contas)) +
             (SELECT COALESCE(SUM(saldo_inicial_centavos), 0) FROM financas_contas)
             AS saldo_centavos
         """,

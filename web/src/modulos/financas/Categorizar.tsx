@@ -12,12 +12,20 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../../lib/api'
 import { formatarMagnitude } from '../../lib/dinheiro'
-import { aplicar, confirmar, progresso, reverter, type Grupo } from '../../lib/otimista'
+import {
+  aplicar,
+  confirmar,
+  progresso,
+  regraAmpla,
+  reverter,
+  type Grupo,
+} from '../../lib/otimista'
 
 type Aplicado = { fit_ids: string[]; regra_criada: boolean }
 
 export function Categorizar() {
   const [grupos, setGrupos] = useState<Grupo[] | null>(null)
+  const [categoriasUsadas, setCategoriasUsadas] = useState<string[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [escolhas, setEscolhas] = useState<Record<string, string>>({})
   const [comRegra, setComRegra] = useState<Record<string, boolean>>({})
@@ -30,6 +38,9 @@ export function Categorizar() {
       .get<Grupo[]>('/api/financas/sugestoes-de-regra?limite=30')
       .then(setGrupos)
       .catch((e) => setErro(e.message))
+    // As categorias que já existem: digitar de novo foi como nasceram 'compras'
+    // e 'Compras' como duas fatias do mesmo gasto.
+    api.get<string[]>('/api/financas/categorias-usadas').then(setCategoriasUsadas).catch(() => {})
   }, [])
 
   async function aplicarGrupo(grupo: Grupo) {
@@ -116,22 +127,49 @@ export function Categorizar() {
                   <>
                     <input
                       id={`categoria-${grupo.padrao}`}
+                      list="categorias-existentes"
                       value={escolhas[grupo.padrao] ?? ''}
-                      placeholder="escolher…"
+                      placeholder="escolher ou digitar…"
                       onChange={(e) =>
                         setEscolhas({ ...escolhas, [grupo.padrao]: e.target.value })
                       }
                     />
+                    {grupo.categoria_sugerida &&
+                      escolhas[grupo.padrao] !== grupo.categoria_sugerida && (
+                        <button
+                          type="button"
+                          className="sugestao"
+                          onClick={() =>
+                            setEscolhas({
+                              ...escolhas,
+                              [grupo.padrao]: grupo.categoria_sugerida as string,
+                            })
+                          }
+                          title={`"${grupo.sugerida_por}" já aparece em ${grupo.sugestao_transacoes} transação(ões) dessa categoria`}
+                        >
+                          usar <strong>{grupo.categoria_sugerida}</strong>
+                          <span className="porque">
+                            porque “{grupo.sugerida_por}” já está lá ({grupo.sugestao_transacoes}×)
+                          </span>
+                        </button>
+                      )}
                     <label className="regra">
                       <input
                         type="checkbox"
-                        checked={comRegra[grupo.padrao] ?? true}
+                        checked={comRegra[grupo.padrao] ?? !regraAmpla(grupo)}
                         onChange={(e) =>
                           setComRegra({ ...comRegra, [grupo.padrao]: e.target.checked })
                         }
                       />
                       criar regra — pega {grupo.alcance} agora e os próximos extratos
                     </label>
+                    {regraAmpla(grupo) && (
+                      <div className="alerta-regra">
+                        “{grupo.padrao}” alcança {grupo.alcance} transações, bem mais que as{' '}
+                        {grupo.ocorrencias} deste grupo — a regra levaria junto o que não é daqui.
+                        Desmarcado por padrão.
+                      </div>
+                    )}
                     {grupo.erro && <div className="falhou">não aplicou: {grupo.erro}</div>}
                   </>
                 )}
@@ -145,6 +183,14 @@ export function Categorizar() {
           ))}
         </tbody>
       </table>
+
+      {/* Uma lista só para todos os campos: o navegador oferece o que já existe,
+          e digitar algo novo continua livre. */}
+      <datalist id="categorias-existentes">
+        {categoriasUsadas.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
 
       {desfazivel && (
         <div className="desfazer">

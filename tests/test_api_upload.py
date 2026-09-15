@@ -113,3 +113,50 @@ def test_pdf_que_nao_reconcilia_e_recusado_e_nao_fica_no_disco(cliente, tmp_path
 
     assert r.status_code == 422
     assert not list(destino.glob("*.pdf"))
+
+
+def test_upload_regenera_os_alertas_como_a_cli_faz(cliente, monkeypatch):
+    """Paridade: `financas importar` aprende gastos fixos e gera insights ao fim.
+    Se a tela não fizer o mesmo, quem usa a interface para de receber alerta —
+    e não tem como perceber que parou."""
+    chamou = []
+    import personalos.modulos.financas.api as modulo_api
+
+    monkeypatch.setattr(modulo_api, "reprocessar_insights", lambda engine: chamou.append(engine))
+    api, _ = cliente
+
+    api.post(
+        "/api/financas/extratos",
+        files={"arquivos": ("extrato.ofx", OFX_MINIMO, "application/octet-stream")},
+    )
+
+    assert len(chamou) == 1, "importar pela tela não regenerou os alertas"
+
+
+def test_extrato_gravado_nao_fica_legivel_por_outros(cliente):
+    """Extrato bancário com permissão 644 é legível por qualquer usuário local.
+    O banco e os backups já eram 600; a pasta de extratos nasceu com o umask
+    padrão e ficou 775 — achado na revisão de segurança."""
+    api, destino = cliente
+
+    api.post(
+        "/api/financas/extratos",
+        files={"arquivos": ("extrato.ofx", OFX_MINIMO, "application/octet-stream")},
+    )
+
+    assert destino.stat().st_mode & 0o077 == 0, "pasta de extratos acessível a outros"
+    for arquivo in destino.glob("*.ofx"):
+        assert arquivo.stat().st_mode & 0o077 == 0, f"{arquivo.name} legível por outros"
+
+
+def test_arquivo_de_mesmo_nome_e_conteudo_diferente_nao_apaga_o_anterior(cliente):
+    """Os extratos originais são a recuperação de desastre. Sobrescrever em
+    silêncio um arquivo de mesmo nome apagaria a cópia boa."""
+    api, destino = cliente
+    outro = OFX_MINIMO.replace(b"up1", b"up2").replace(b"-50.00", b"-70.00")
+
+    api.post("/api/financas/extratos", files={"arquivos": ("extrato.ofx", OFX_MINIMO, "application/octet-stream")})
+    api.post("/api/financas/extratos", files={"arquivos": ("extrato.ofx", outro, "application/octet-stream")})
+
+    guardados = sorted(p.read_bytes() for p in destino.glob("*.ofx"))
+    assert len(guardados) == 2, "o segundo envio apagou o primeiro"

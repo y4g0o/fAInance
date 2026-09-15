@@ -21,6 +21,7 @@ from sqlalchemy.engine import Engine
 
 from personalos.api.dependencias import obter_engine
 from personalos.modulos.financas.aplicacao import analise, consultas, escrita, sugestoes
+from personalos.modulos.financas.aplicacao.escrita import reprocessar_insights
 from personalos.modulos.financas.aplicacao.importar import importar_extratos
 from personalos.modulos.financas.infra.leitores import detectar_leitor
 from personalos.nucleo.config import diretorio_extratos
@@ -43,6 +44,30 @@ EXTENSOES = frozenset({".ofx", ".qfx", ".csv", ".xlsx", ".pdf"})
 # Extrato de um ano em PDF não passa de alguns MB. O limite existe para que um
 # arquivo enorme não encha o disco antes de alguém perceber.
 TAMANHO_MAXIMO = 10 * 1024 * 1024
+
+
+# Ler em pedaços de 1 MB: o limite precisa valer DURANTE a leitura.
+PEDACO = 1024 * 1024
+
+
+def caminho_livre(destino: Path, nome: str, conteudo: bytes) -> Path:
+    """Onde gravar sem apagar arquivo anterior de mesmo nome.
+
+    Os extratos originais são a recuperação de desastre. Reenviar o MESMO
+    arquivo é o caso comum e pode sobrescrever à vontade; conteúdo diferente com
+    o mesmo nome ganha sufixo, porque apagar a cópia boa em silêncio é perda de
+    dado que ninguém percebe.
+    """
+    caminho = destino / nome
+    if not caminho.exists() or caminho.read_bytes() == conteudo:
+        return caminho
+    base, sufixo = caminho.stem, caminho.suffix
+    n = 2
+    while (alternativo := destino / f"{base}-{n}{sufixo}").exists():
+        if alternativo.read_bytes() == conteudo:
+            return alternativo
+        n += 1
+    return alternativo
 
 
 def nome_seguro(enviado: str | None) -> str:
@@ -73,6 +98,15 @@ class EntradaLote(BaseModel):
 class EntradaDesfazer(BaseModel):
     fit_ids: list[str]
     padrao_da_regra: str | None = None
+
+
+class EntradaRenomear(BaseModel):
+    de: str
+    para: str
+
+
+class EntradaNaoConsumo(BaseModel):
+    e_movimentacao: bool = True
 
 
 class EntradaConta(BaseModel):
@@ -125,7 +159,9 @@ def criar_router() -> APIRouter:
                 "total_centavos": total.centavos,
                 "total_formatado": total.formatar(),
             }
-            for nome, total in consultas.gastos_por_categoria(repo)
+            for nome, total in consultas.gastos_por_categoria(
+                repo, nao_consumo=escrita.categorias_nao_consumo(engine)
+            )
         ]
 
     @router.get("/gastos")
@@ -164,8 +200,41 @@ def criar_router() -> APIRouter:
     @router.get("/sugestoes-de-regra")
     def obter_sugestoes(
         engine: Motor, limite: Annotated[int, Query(ge=1, le=50)] = 10
-    ) -> list[sugestoes.SugestaoRegra]:
-        return sugestoes.sugerir_regras(engine, limite)
+    ) -> list[dict[str, Any]]:
+        """Grupos sem categoria, com a categoria que o histórico do usuário sugere.
+
+        A sugestão carrega a evidência (`sugerida_por`, `sugestao_transacoes`):
+        sugestão sem justificativa é adivinhação com cara de autoridade.
+        """
+        resultado = []
+        for g in sugestoes.sugerir_regras(engine, limite):
+            sugestao = sugestoes.sugerir_categoria(engine, g.exemplo)
+            resultado.append(
+                {
+                    "padrao": g.padrao,
+                    "exemplo": g.exemplo,
+                    "ocorrencias": g.ocorrencias,
+                    "total_centavos": g.total_centavos,
+                    "alcance": g.alcance,
+                    "categoria_sugerida": sugestao.categoria if sugestao else None,
+                    "sugerida_por": sugestao.palavra if sugestao else None,
+                    "sugestao_transacoes": sugestao.transacoes if sugestao else 0,
+                }
+            )
+        return resultado
+
+    @router.get("/categorias-usadas")
+    def obter_categorias_usadas(engine: Motor) -> list[str]:
+        """As categorias que já existem — para a tela oferecer em vez de pedir
+        que o usuário digite de novo e crie 'compras' ao lado de 'Compras'."""
+        with engine.connect() as conn:
+            linhas = conn.execute(
+                text(
+                    "SELECT DISTINCT categoria FROM financas_transacoes "
+                    "WHERE categoria IS NOT NULL AND categoria <> '' ORDER BY categoria"
+                )
+            ).all()
+        return [str(linha.categoria) for linha in linhas]
 
     # ---------- escrita ----------
     # Nenhuma regra de negócio aqui: cada rota adapta HTTP para a MESMA função de
@@ -178,6 +247,7 @@ def criar_router() -> APIRouter:
             resultado = escrita.lancar(
                 RepoTransacoesSQL(engine),
                 RepoRegrasSQL(engine),
+                RepoContasSQL(engine),
                 descricao=entrada.descricao,
                 valor=entrada.valor,
                 tipo=entrada.tipo,
@@ -266,7 +336,11 @@ def criar_router() -> APIRouter:
     async def enviar_extratos(arquivos: list[UploadFile], engine: Motor) -> dict[str, Any]:
         """Recebe extratos, guarda em disco e importa. Dedup por fit_id."""
         destino = diretorio_extratos()
-        destino.mkdir(parents=True, exist_ok=True)
+        # 0o700: extrato bancário não pode ficar legível para outros usuários da
+        # máquina. O banco e os backups já eram assim; esta pasta nascia com o
+        # umask padrão (775) — achado na revisão de segurança.
+        destino.mkdir(parents=True, exist_ok=True, mode=0o700)
+        destino.chmod(0o700)
         gravados: list[str] = []
         for enviado in arquivos:
             nome = nome_seguro(enviado.filename)
@@ -275,14 +349,23 @@ def criar_router() -> APIRouter:
                     status_code=415,
                     detail=f"{nome}: formato não suportado (aceito: {', '.join(sorted(EXTENSOES))})",
                 )
-            conteudo = await enviado.read()
-            if len(conteudo) > TAMANHO_MAXIMO:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"{nome}: passa de {TAMANHO_MAXIMO // (1024 * 1024)} MB",
-                )
-            caminho = destino / nome
+            # Lê em pedaços e para no limite: `read()` inteiro bufferiza o arquivo
+            # ANTES de conferir o tamanho, então o limite não protegia de nada.
+            partes: list[bytes] = []
+            lidos = 0
+            while pedaco := await enviado.read(PEDACO):
+                lidos += len(pedaco)
+                if lidos > TAMANHO_MAXIMO:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"{nome}: passa de {TAMANHO_MAXIMO // (1024 * 1024)} MB",
+                    )
+                partes.append(pedaco)
+            conteudo = b"".join(partes)
+
+            caminho = caminho_livre(destino, nome, conteudo)
             caminho.write_bytes(conteudo)
+            caminho.chmod(0o600)
             gravados.append(str(caminho))
 
         try:
@@ -295,6 +378,84 @@ def criar_router() -> APIRouter:
             for caminho_gravado in gravados:
                 Path(caminho_gravado).unlink(missing_ok=True)
             raise HTTPException(status_code=422, detail=str(e)) from e
-        return {"novas": novas, "arquivos": [Path(c).name for c in gravados]}
+        # Mesma coisa que `financas importar` faz ao fim: sem isto, quem usa a
+        # tela para de receber alerta e não tem como perceber.
+        alertas = reprocessar_insights(engine)
+        return {
+            "novas": novas,
+            "arquivos": [Path(c).name for c in gravados],
+            "alertas_novos": alertas,
+        }
+
+    # ---------- o que o sistema aprendeu, e como discordar ----------
+
+    @router.get("/pode-comprar")
+    def simular_compra(
+        engine: Motor,
+        valor_centavos: Annotated[int, Query(ge=1)],
+        parcelas: Annotated[int, Query(ge=1, le=120)] = 1,
+        taxa_mensal: Annotated[float, Query(ge=0, le=1)] = 0.0,
+        parcela_centavos: Annotated[int | None, Query(ge=1)] = None,
+    ) -> analise.Compra:
+        """Os números de uma compra — sem veredito. A decisão é do usuário.
+
+        Informar o valor da parcela revela a taxa embutida: é assim que se
+        descobre que o "10x sem juros" tem juro.
+        """
+        try:
+            return analise.pode_comprar(
+                engine, valor_centavos, parcelas, taxa_mensal, parcela_centavos
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+
+    @router.get("/fixos")
+    def listar_fixos(engine: Motor) -> list[dict[str, Any]]:
+        """Gastos fixos aprendidos. A tela precisa MOSTRAR isto: hoje o usuário só
+        descobre o que o sistema aprendeu quando um alerta estranho aparece."""
+        from personalos.modulos.financas.insights import gastos_fixos_conhecidos
+
+        return [
+            {
+                "chave": f.chave,
+                "descricao_exemplo": f.descricao_exemplo,
+                "valor_mediano_centavos": f.valor_mediano_centavos,
+                "valor_mediano_formatado": Dinheiro(f.valor_mediano_centavos).formatar(),
+                "meses": len(f.meses),
+                "ultima_data": f.ultima_data,
+            }
+            for f in gastos_fixos_conhecidos(engine)
+        ]
+
+    @router.post("/fixos/{chave}/esquecer")
+    def esquecer_fixo(chave: str, engine: Motor) -> dict[str, Any]:
+        """Esquece E registra que não deve voltar — sem isso a correção dura até
+        a próxima importação."""
+        from personalos.modulos.financas.insights import esquecer_fixo as esquecer
+
+        return {"chave": chave, "existia": esquecer(engine, chave)}
+
+    @router.post("/categorias/renomear")
+    def renomear_categoria(entrada: EntradaRenomear, engine: Motor) -> dict[str, int]:
+        try:
+            mudadas = escrita.renomear_categoria(
+                RepoTransacoesSQL(engine), de=entrada.de, para=entrada.para
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+        return {"mudadas": mudadas}
+
+    @router.post("/categorias/{nome}/nao-consumo")
+    def marcar_nao_consumo(nome: str, entrada: EntradaNaoConsumo, engine: Motor) -> dict[str, Any]:
+        """Declara que a categoria MOVE dinheiro em vez de consumi-lo.
+
+        Declarar errado ESCONDE gasto, então é explícito e nunca inferido.
+        """
+        escrita.declarar_nao_consumo(engine, nome, e_movimentacao=entrada.e_movimentacao)
+        return {"categoria": nome, "e_movimentacao": entrada.e_movimentacao}
+
+    @router.get("/categorias-nao-consumo")
+    def listar_nao_consumo(engine: Motor) -> list[str]:
+        return sorted(escrita.categorias_nao_consumo(engine))
 
     return router

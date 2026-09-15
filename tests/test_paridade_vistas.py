@@ -26,12 +26,21 @@ def _semear(tmp_path: Path):
     return engine, repo_tx
 
 
-def test_paridade_saldo_sem_conta_declarada(tmp_path):
+def test_saldo_e_zero_enquanto_nenhuma_conta_tem_ponto_de_partida(tmp_path):
+    """Regra nova: sem saldo inicial declarado não há saldo, há movimento.
+
+    Antes a view somava o movimento de qualquer conta, e ao importar a segunda o
+    "saldo" virou o da primeira mais o líquido da segunda — número que não
+    descreve nada. `consultas.saldo` continua somando só movimento, e é por isso
+    que ele NÃO é mais o espelho da view: são perguntas diferentes.
+    """
     engine, repo_tx = _semear(tmp_path)
-    esperado = consultas.saldo(repo_tx).centavos
+
     with engine.connect() as conn:
         real = conn.execute(text("SELECT saldo_centavos FROM vw_financas_saldo_v1")).scalar()
-    assert real == esperado
+
+    assert real == 0
+    assert consultas.saldo(repo_tx).centavos != 0  # movimento existe, saldo não
 
 
 def test_paridade_saldo_com_saldo_inicial(tmp_path):

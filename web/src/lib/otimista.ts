@@ -13,6 +13,11 @@ export type Grupo = {
   ocorrencias: number
   total_centavos: number
   alcance: number
+  /** Categoria que o HISTÓRICO do usuário sugere — nunca um palpite de modelo. */
+  categoria_sugerida?: string | null
+  /** A palavra que casou: é a justificativa, e sem ela a sugestão é adivinhação. */
+  sugerida_por?: string | null
+  sugestao_transacoes?: number
   aplicado?: { categoria: string; confirmado: boolean }
   erro?: string
 }
@@ -49,4 +54,17 @@ export function progresso(grupos: Grupo[]): { resolvido: number; total: number }
     .filter((g) => g.aplicado)
     .reduce((soma, g) => soma + g.total_centavos, 0)
   return { resolvido, total }
+}
+
+
+/**
+ * A regra pega muito mais do que o grupo que você está vendo?
+ *
+ * Caso real: um padrão de 8 transações alcançava 45. Criar a regra arrastava 37
+ * não relacionadas, e foi assim que centenas de compras foram marcadas como
+ * movimentação sem ninguém perceber. O número já aparecia na tela; faltava dizer
+ * que ele era um problema.
+ */
+export function regraAmpla(grupo: Grupo, fator = 2): boolean {
+  return grupo.alcance > Math.max(grupo.ocorrencias * fator, grupo.ocorrencias + 3)
 }

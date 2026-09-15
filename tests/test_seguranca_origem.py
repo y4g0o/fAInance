@@ -47,3 +47,33 @@ def test_escrita_da_propria_interface_passa(cliente):
 def test_leitura_nao_e_afetada(cliente):
     """GET não muda estado; exigir Origin nele só quebraria abrir a página."""
     assert cliente.get("/api/saude").status_code == 200
+
+
+def test_host_forjado_nao_autoriza_escrita(cliente):
+    """DNS rebinding: um site cujo domínio resolve para 127.0.0.1 faz o navegador
+    enviar Host E Origin dele mesmo. Comparar um com o outro não protege nada —
+    os dois são do atacante.
+
+    Verificado contra o servidor real antes do conserto: a requisição respondeu
+    201 e GRAVOU uma transação no banco.
+    """
+    r = cliente.post(
+        "/api/financas/lancamentos",
+        json=LANCAMENTO,
+        headers={"Host": "site-malicioso.com:8000", "Origin": "http://site-malicioso.com:8000"},
+    )
+
+    assert r.status_code == 403
+
+
+def test_host_de_loopback_com_porta_continua_valendo(cliente):
+    """O uso normal não pode quebrar: localhost e 127.0.0.1, com ou sem porta."""
+    for host, origem in [
+        ("127.0.0.1:8000", "http://127.0.0.1:8000"),
+        ("localhost:8000", "http://localhost:8000"),
+        ("127.0.0.1", "http://127.0.0.1"),
+    ]:
+        r = cliente.post(
+            "/api/financas/lancamentos", json=LANCAMENTO, headers={"Host": host, "Origin": origem}
+        )
+        assert r.status_code == 201, f"uso legítimo recusado: {host}"

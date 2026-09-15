@@ -203,3 +203,36 @@ def test_lancar_entra_no_saldo(tmp_path):
     runner.invoke(app, ["lancar", "mercado", "200,00", "--db", str(db)])
     resultado = runner.invoke(app, ["saldo", "--db", str(db)])
     assert "R$ 2.800,00" in resultado.stdout
+
+
+def test_esquecer_fixo_de_chave_nova_registra_e_nao_falha(tmp_path):
+    """Marcar de antemão algo que você sabe que será detectado errado é uso
+    legítimo. Sair com erro escondia que a decisão tinha sido guardada."""
+    db = tmp_path / "t.db"
+    resultado = CliRunner().invoke(
+        app, ["esquecer-fixo", "assinatura qualquer", "--db", str(db)]
+    )
+
+    assert resultado.exit_code == 0
+    assert "não ser aprendido" in resultado.stdout
+
+
+def test_renomear_categoria_junta_variantes_pela_cli(tmp_path):
+    """'compras' e 'Compras' viram duas fatias do mesmo gasto no relatório."""
+    db = tmp_path / "t.db"
+    engine = criar_engine(db, metadatas=(metadata_financas,), vistas=VISTAS)
+    RepoTransacoesSQL(engine).inserir_muitas(
+        [
+            Transacao("a1", date(2026, 6, 1), Dinheiro(-1000), "LOJA UM", "c", "compras"),
+            Transacao("a2", date(2026, 6, 2), Dinheiro(-2000), "LOJA DOIS", "c", "Compras"),
+        ]
+    )
+
+    resultado = CliRunner().invoke(
+        app, ["renomear-categoria", "compras", "Compras", "--db", str(db)]
+    )
+
+    assert resultado.exit_code == 0
+    assert "1 transação" in resultado.stdout
+    categorias = {t.categoria for t in RepoTransacoesSQL(engine).listar()}
+    assert categorias == {"Compras"}

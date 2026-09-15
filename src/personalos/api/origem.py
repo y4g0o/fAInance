@@ -23,10 +23,32 @@ from starlette.responses import Response
 
 METODOS_QUE_ESCREVEM = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
+# O servidor só aceita bind em loopback (`cli._validar_host`), então qualquer
+# outro Host é forjado. Esta lista não é conveniência: é o que impede DNS
+# rebinding.
+HOSTS_DE_LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
+
+
+def _sem_porta(host: str) -> str:
+    """Tira a porta de 'host:porta', respeitando IPv6 em colchetes."""
+    if host.startswith("["):
+        return host.split("]")[0] + "]"
+    return host.split(":")[0]
+
 
 def origem_permitida(origem: str | None, host: str | None) -> bool:
-    """Aceita apenas a origem servida por este próprio processo."""
+    """Aceita escrita apenas da interface servida por este próprio processo.
+
+    Confere o HOST contra uma lista fixa antes de qualquer coisa. A versão
+    anterior comparava Origin com Host — e num ataque de DNS rebinding os DOIS
+    são do atacante: um domínio dele resolve para 127.0.0.1, o navegador envia
+    Host e Origin desse domínio, e a comparação fecha.
+
+    Foi verificado contra o servidor real: a requisição respondia 201 e gravava.
+    """
     if not origem or not host:
+        return False
+    if _sem_porta(host) not in HOSTS_DE_LOOPBACK:
         return False
     return origem in (f"http://{host}", f"https://{host}")
 

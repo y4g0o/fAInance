@@ -13,7 +13,7 @@ from personalos.modulos.financas.aplicacao.analise import (
 )
 from personalos.modulos.financas.dominio.dinheiro import Dinheiro
 from personalos.modulos.financas.dominio.modelos import Transacao
-from personalos.modulos.financas.infra.repositorios import RepoTransacoesSQL
+from personalos.modulos.financas.infra.repositorios import RepoContasSQL, RepoTransacoesSQL
 from personalos.modulos.financas.infra.tabelas import metadata as metadata_financas
 from personalos.modulos.financas.insights import aprender_gastos_fixos, detectar_gastos_fixos
 from personalos.nucleo.db import criar_engine
@@ -33,6 +33,9 @@ def _cenario(tmp_path: Path):
     Receita: 5000/mês.
     """
     engine = criar_engine(tmp_path / "t.db", metadatas=(metadata_financas,), vistas=VISTAS)
+    # Saldo só existe para conta com ponto de partida declarado; sem isto,
+    # "meses de reserva" não teria resposta — e não ter resposta é o correto.
+    RepoContasSQL(engine).definir_saldo_inicial("nu", Dinheiro(0))
     transacoes = []
     for mes in (4, 5, 6, 7):
         transacoes += [
@@ -185,6 +188,9 @@ def _cenario_com_nao_consumo(tmp_path: Path):
     """4 meses fechados com salário, aluguel (fixo), mercado (variável) e — o ponto
     do teste — transferência para si mesmo e aplicação, que NÃO são consumo."""
     engine = criar_engine(tmp_path / "t.db", metadatas=(metadata_financas,), vistas=VISTAS)
+    # Saldo só existe para conta com ponto de partida declarado; sem isto,
+    # "meses de reserva" não teria resposta — e não ter resposta é o correto.
+    RepoContasSQL(engine).definir_saldo_inicial("nu", Dinheiro(0))
     transacoes = []
     for mes in (4, 5, 6, 7):
         transacoes += [

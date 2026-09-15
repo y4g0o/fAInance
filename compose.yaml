@@ -2,7 +2,10 @@ services:
   metabase:
     image: metabase/metabase:latest
     ports:
-      - "3000:3000"
+      # Só loopback. "3000:3000" publica na rede inteira, e o setup inicial do
+      # Metabase é SEM autenticação: qualquer um no mesmo wifi abriria a tela de
+      # criação de conta e depois leria as finanças. Achado na revisão.
+      - "127.0.0.1:3000:3000"
     volumes:
       - ${HOME}/.local/share/personalos/personalos.db:/data/personalos.db:ro
       - metabase-data:/metabase-data

@@ -28,3 +28,4 @@ reaberta, e evita tanto teimosia quanto reescrita por moda.
 | [0007](0007-painel-sem-javascript.md) | Painel sem JavaScript (SVG no servidor) | Substituída pela 0008 |
 | [0008](0008-spa-react-substitui-painel-sem-js.md) | SPA React substitui o painel sem JavaScript | Aceita |
 | [0009](0009-escrita-http-e-verificacao-de-origem.md) | Escrita via HTTP e verificação de origem | Aceita |
+| [0010](0010-superficie-de-ataque-do-painel-local.md) | Superfície de ataque de um painel local sem senha | Aceita |

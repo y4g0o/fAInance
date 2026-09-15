@@ -45,10 +45,18 @@ def _gets_sem_parametro(app) -> list[str]:
     varredor daria falso verde justamente sobre o código novo. O OpenAPI é a fonte
     autoritativa e não depende da representação interna.
     """
+    def sem_obrigatorio(operacao) -> bool:
+        """Rota com parâmetro obrigatório não pode ser chamada sem argumento.
+
+        Chamá-la vazia devolve 422 — que é o comportamento CERTO, não uma falha.
+        O varredor existe para pegar rota que quebra, não rota que exige entrada.
+        """
+        return not any(p.get("required") for p in operacao.get("parameters", []))
+
     return sorted(
         caminho
         for caminho, metodos in app.openapi()["paths"].items()
-        if "get" in metodos and "{" not in caminho
+        if "get" in metodos and "{" not in caminho and sem_obrigatorio(metodos["get"])
     )
 
 

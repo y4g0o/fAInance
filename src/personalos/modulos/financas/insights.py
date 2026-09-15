@@ -27,6 +27,10 @@ from personalos.nucleo.modulo import Insight, RegraInsight
 
 MODULO = "financas"
 TIPO_FATO = "gasto_fixo"
+# Decisão do usuário de que algo NÃO é gasto fixo. Precisa ser guardada: apagar
+# só o fato aprendido dura até o próximo `importar`, que reaprende na hora — a
+# correção evaporava sem ninguém perceber.
+TIPO_IGNORADO = "gasto_fixo_ignorado"
 
 MESES_MINIMOS = 3          # menos que isso é coincidência, não hábito
 TOLERANCIA_VALOR = 0.25    # ±25% da mediana ainda é "o mesmo" gasto fixo
@@ -145,8 +149,13 @@ def aprender_gastos_fixos(engine: Engine, hoje: date | None = None) -> list[Gast
 
     Não remove fatos que deixaram de ser detectados: se você corrigiu ou nomeou um
     fixo, apagá-lo é decisão sua (`personalos financas esquecer-fixo`).
+
+    O que o usuário mandou esquecer fica de fora **para sempre**: a decisão dele
+    vale mais que o critério estatístico, e sem isso ela duraria até o próximo
+    extrato.
     """
-    fixos = detectar_gastos_fixos(engine, hoje)
+    ignorados = {f.chave for f in memoria.listar(engine, MODULO, TIPO_IGNORADO)}
+    fixos = [f for f in detectar_gastos_fixos(engine, hoje) if f.chave not in ignorados]
     for fixo in fixos:
         memoria.definir(
             engine, MODULO, TIPO_FATO, fixo.chave,
@@ -343,3 +352,15 @@ REGRAS: tuple[RegraInsight, ...] = (
     RegraInsight("financas_fixo_aumentou", regra_fixo_aumentou),
     RegraInsight("financas_categoria_acima_da_media", regra_categoria_acima_da_media),
 )
+
+
+def esquecer_fixo(engine: Engine, chave: str) -> bool:
+    """Esquece um gasto fixo E registra que ele não deve voltar a ser aprendido.
+
+    Guardar a decisão é o ponto: compra recorrente de marketplace atende ao
+    critério (3 meses, valor parecido) e será redetectada a cada importação.
+    Sem o registro, o usuário esqueceria o mesmo gasto todo mês.
+    """
+    existia = memoria.remover(engine, MODULO, TIPO_FATO, chave)
+    memoria.definir(engine, MODULO, TIPO_IGNORADO, chave, {"motivo": "decisão do usuário"})
+    return existia

@@ -212,3 +212,31 @@ def test_recategorizar_sem_regra_que_case_nao_muda_nada(tmp_path):
     RepoRegrasSQL(engine).adicionar(Regra("farmacia", "Saúde"))
     assert recategorizar(engine) == 0
     assert RepoTransacoesSQL(engine).listar()[0].categoria is None
+
+
+def test_palavra_que_aparece_em_quase_tudo_nao_vira_padrao(tmp_path):
+    """Falha real e perigosa: o Nubank escreve 'Transferência enviada pelo Pix -
+    NOME', e o padrão sugerido para TODOS os grupos virou 'transferência'. Criar
+    regra com esse padrão pegaria centenas de transações não relacionadas — o
+    mesmo estrago que uma regra ampla demais já tinha causado.
+
+    Lista fixa de palavras genéricas não resolve: ela sempre perde o vocabulário
+    do próximo banco. Genérico é o que aparece em muita transação, e isso o
+    próprio dado informa.
+    """
+    from personalos.modulos.financas.aplicacao.sugestoes import sugerir_regras
+
+    engine = criar_engine(tmp_path / "t.db", metadatas=(metadata_financas,), vistas=VISTAS)
+    RepoTransacoesSQL(engine).inserir_muitas(
+        [
+            Transacao(f"t{i}", date(2026, 6, (i % 27) + 1), Dinheiro(-1000 - i),
+                      f"Transferencia enviada pelo Pix - DESTINO{i // 4}", "n")
+            for i in range(20)
+        ]
+    )
+
+    sugestoes = sugerir_regras(engine, limite=10)
+
+    assert all("transferencia" not in s.padrao for s in sugestoes), (
+        f"padrão genérico sugerido: {[s.padrao for s in sugestoes]}"
+    )

@@ -26,7 +26,7 @@ test('categorizar um grupo pela tela muda o banco, e desfazer volta', async ({ p
   const linha = page.locator('tr', { hasText: 'deliveria' })
   await expect(linha).toBeVisible()
 
-  await linha.getByPlaceholder('escolher…').fill('Delivery')
+  await linha.locator('input[list="categorias-existentes"]').fill('Delivery')
   await linha.getByRole('button', { name: 'Aplicar' }).click()
 
   // Efeito na tela…
@@ -55,7 +55,7 @@ test('a operação não recarrega a página', async ({ page }) => {
   })
 
   const linha = page.locator('tr', { hasText: 'telecomix' })
-  await linha.getByPlaceholder('escolher…').fill('Serviços')
+  await linha.locator('input[list="categorias-existentes"]').fill('Serviços')
   await linha.getByRole('button', { name: 'Aplicar' }).click()
   await expect(linha.getByText('Serviços')).toBeVisible()
 

@@ -33,6 +33,10 @@ função que os produziu.
 - **Responde perguntas de decisão**: custo básico, onde cortar (ranqueado pelo
   impacto anual), projeção do mês, e o juro real embutido num parcelamento.
 - **Interface web local** em React, com atualização otimista e desfazer.
+- **Sugere categoria a partir do próprio histórico** — e só quando há precedente,
+  com a palavra que casou visível. Sem precedente, não sugere: campo vazio é
+  melhor que palpite.
+- **Simula a compra parcelada** e mostra o juro que o "sem juros" esconde.
 
 ## Decisões que valem mais que o código
 
@@ -46,6 +50,7 @@ justificativa e **gatilho de revisão**. Algumas:
 | [0004](docs/adr/0004-convencao-de-sinal-nas-views.md) | Convenção de sinal única nas views |
 | [0006](docs/adr/0006-composition-root-fora-do-kernel.md) | Composition root fora do kernel |
 | [0007](docs/adr/0007-painel-sem-javascript.md) | Painel sem JavaScript — e por que foi substituída depois |
+| [0010](docs/adr/0010-superficie-de-ataque-do-painel-local.md) | **Superfície de ataque de um painel local sem senha** — inclui uma falha explorável encontrada e corrigida |
 
 O desenho completo está em [`docs/specs/`](docs/specs/).
 
@@ -70,8 +75,9 @@ Bind fora de loopback é **recusado sem escape hatch**: não há autenticação,
 expor publicaria dados financeiros na rede.
 
 ```bash
-.venv/bin/pytest          # 287 testes
+.venv/bin/pytest          # back-end
 cd web && npm test        # lógica pura do front
+cd web && npm run e2e     # fluxo principal no navegador (Playwright)
 ```
 
 ## Uso
