@@ -1,300 +1,365 @@
+🇺🇸 English · [🇧🇷 Português](README.pt-BR.md)
+
 # fAInance
 
-**Sistema financeiro pessoal, local e determinístico.** Lê os extratos do seu
-banco, aprende os gastos fixos sozinho e responde perguntas de decisão — sem que
-nenhum dado saia da sua máquina e sem que nenhum número venha de um modelo de
-linguagem.
+**Local, deterministic personal finance.** It reads your bank statements, learns your fixed expenses
+on its own and answers decision questions — no data leaves your machine and no number comes from a
+language model.
 
-![Tela de categorização em lote](docs/imagens/categorizar.png)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![Tests: pytest + vitest](https://img.shields.io/badge/tests-pytest%20%2B%20vitest-green.svg)](tests/)
 
-> A tela acima resolve o problema que mata sistema financeiro pessoal: depois de
-> importar um ano de extrato, tudo nasce sem categoria. Em vez de pedir 200
-> cliques, o sistema agrupa as transações, ordena os grupos **pelo dinheiro que
-> representam** e ensina uma regra a cada escolha — meia dúzia de decisões cobre
-> a maior parte do valor.
+![Batch categorization screen](docs/imagens/categorizar.png)
 
-## Por que ele existe
+> The screen above solves the problem that kills personal finance tools: after importing a year of
+> statements, everything starts uncategorized. Instead of asking for 200 clicks, the system groups the
+> transactions, sorts the groups **by the money they represent** and learns a rule from each choice —
+> half a dozen decisions cover most of the value.
 
-Aplicativo de banco mostra o que você gastou. O que ninguém responde é o que
-importa: *quanto custa existir por mês, onde cortaria mais, e se dá pra comprar
-isso parcelado.* Este projeto responde essas três, com números rastreáveis até a
-função que os produziu.
+The Python package and CLI are called **`personalos`** (PersonalOS): fAInance is its finance module,
+built on a small modular kernel. UI text, CLI commands and code identifiers are in Portuguese.
+Author: **Yago Macambira**.
 
-## O que ele faz
+## 💡 Why
 
-- **Importa extrato** em OFX, CSV, XLSX e **PDF**, com reconciliação contra os
-  saldos declarados no próprio documento — se a soma não bater, o arquivo é
-  recusado em vez de entrar errado.
-- **Aprende gastos fixos** do histórico: agrupa por descrição normalizada, exige
-  presença em ≥3 meses e valor estável. Zero LLM nos números.
-- **Detecta anomalia** por z-score modificado (mediana + MAD, Iglewicz-Hoaglin),
-  porque média e desvio padrão são contaminados justamente pelo mês que se quer
-  detectar.
-- **Responde perguntas de decisão**: custo básico, onde cortar (ranqueado pelo
-  impacto anual), projeção do mês, e o juro real embutido num parcelamento.
-- **Interface web local** em React, com atualização otimista e desfazer.
-- **Sugere categoria a partir do próprio histórico** — e só quando há precedente,
-  com a palavra que casou visível. Sem precedente, não sugere: campo vazio é
-  melhor que palpite.
-- **Simula a compra parcelada** e mostra o juro que o "sem juros" esconde.
+A bank app shows what you spent. What nobody answers is what matters: *how much does it cost to exist
+each month, where would cutting help most, and can I afford this in installments?* This project
+answers those three, with numbers traceable to the function that produced them.
 
-## Decisões que valem mais que o código
+## ✨ Key features
 
-As caras de reverter estão em [`docs/adr/`](docs/adr/), cada uma com contexto,
-justificativa e **gatilho de revisão**. Algumas:
+- **Imports statements** in OFX, CSV, XLSX and **PDF**, reconciling against the balances declared in
+  the document itself — if the sum does not match, the file is rejected instead of entering wrong.
+- **Learns fixed expenses** from history: groups by normalized description, requires presence in
+  ≥3 months and a stable amount. Zero LLM in the numbers.
+- **Detects anomalies** with the modified z-score (median + MAD, Iglewicz-Hoaglin), because mean and
+  standard deviation are contaminated precisely by the month you want to detect.
+- **Answers decision questions**: basic cost of living, where to cut (ranked by annual impact), month-end
+  projection, and the real interest hidden in an installment plan.
+- **Local web interface** in React, with optimistic updates and undo.
+- **Suggests a category from your own history** — only when there is a precedent, with the matching word
+  shown. Without precedent it suggests nothing: an empty field beats a guess.
+- **Simulates installment purchases** and shows the interest that "interest-free" hides.
 
-| ADR | Decisão |
-|---|---|
-| [0001](docs/adr/0001-sqlite-como-banco-unico.md) | SQLite como banco único |
-| [0002](docs/adr/0002-llm-nunca-calcula.md) | **O LLM nunca calcula** — todo número vem de SQL ou função pura |
-| [0004](docs/adr/0004-convencao-de-sinal-nas-views.md) | Convenção de sinal única nas views |
-| [0006](docs/adr/0006-composition-root-fora-do-kernel.md) | Composition root fora do kernel |
-| [0007](docs/adr/0007-painel-sem-javascript.md) | Painel sem JavaScript — e por que foi substituída depois |
-| [0010](docs/adr/0010-superficie-de-ataque-do-painel-local.md) | **Superfície de ataque de um painel local sem senha** — inclui uma falha explorável encontrada e corrigida |
+## 🚀 Quickstart
 
-O desenho completo está em [`docs/specs/`](docs/specs/).
-
-## Arquitetura em uma tela
-
-Kernel modular (`nucleo/`) que **não conhece módulo nenhum**, e módulos em Clean
-Architecture (`dominio/` · `aplicacao/` · `infra/`). Há teste que quebra o build
-se a camada web citar um módulo pelo nome — a fronteira é mecanizada, não
-combinada.
-
-A CLI e a interface web chamam **as mesmas funções** de `aplicacao/`: um teste de
-paridade falha no dia em que um endpoint reimplementar regra de negócio.
-
-## Rodar
+Requirements: Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/). Node.js only if you work on the web UI
+(the built SPA is versioned in `src/personalos/web_dist/`).
 
 ```bash
+git clone https://github.com/y4g0o/fAInance.git
+cd fAInance
 uv venv .venv && uv pip install --python .venv/bin/python -e .
-.venv/bin/personalos servir        # painel e API em http://127.0.0.1:8000
+.venv/bin/personalos servir        # web UI and API at http://127.0.0.1:8000/app/
 ```
 
-Bind fora de loopback é **recusado sem escape hatch**: não há autenticação, e
-expor publicaria dados financeiros na rede.
+Binding outside loopback is **refused with no escape hatch**: there is no authentication, and exposing it
+would publish financial data on the network.
+
+First steps with your own data:
 
 ```bash
+cp ~/Downloads/statement.ofx extratos/            # extratos/ is git-ignored
+.venv/bin/personalos financas importar             # imports every CSV/OFX/QFX/XLSX/PDF in extratos/
+.venv/bin/personalos financas sugerir-regras       # where the uncategorized money is
+.venv/bin/personalos financas custo-basico         # fixed costs + median of variable spending
+```
+
+Tests:
+
+```bash
+uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/pytest          # back-end
-cd web && npm test        # lógica pura do front
-cd web && npm run e2e     # fluxo principal no navegador (Playwright)
+cd web && npm ci && npm test        # pure front-end logic (vitest)
+cd web && npm run e2e     # main flow in the browser (Playwright)
 ```
 
-## Uso
+## 🧭 How it works
+
+- **Modular kernel** (`src/personalos/nucleo/`) that **knows no module**, and modules in Clean Architecture
+  (`dominio/` · `aplicacao/` · `infra/`). A test breaks the build if the web layer names a module — the
+  boundary is mechanized, not agreed upon.
+- The **CLI and the web interface call the same functions** in `aplicacao/`: a parity test
+  (`tests/test_api_escrita.py`) fails the day an endpoint reimplements a business rule.
+- **Every number comes from SQL or a pure function** ([ADR 0002](docs/adr/0002-llm-nunca-calcula.md)).
+  The chat contract (`nucleo/portas/chat.py`) is built so that numbers and the tools that produced them
+  are filled by code, never by an LLM.
+- **SQLite** is the only database ([ADR 0001](docs/adr/0001-sqlite-como-banco-unico.md)), with WAL and
+  write transactions opened with `BEGIN IMMEDIATE` (`nucleo/transacao.py`).
+
+Layout:
+
+- `src/personalos/nucleo/` — kernel: XDG config, shared engine (SQLite+WAL), write transaction
+  (`BEGIN IMMEDIATE`), idempotent migrations, module contract (`Modulo`, a dataclass), memory
+  (`nucleo_memoria`) and insights engine (`nucleo_insights`). **Imports no module** — see ADR 0006.
+- `src/personalos/composicao.py` — composition root: the static list of plugged-in modules. It is the only
+  layer that knows all of them.
+- `src/personalos/modulos/<name>/` — each module is an independent package (Clean Architecture:
+  dominio/aplicacao/infra + `cli.py` + `modulo.py` manifest). Tables are prefixed by module (`financas_*`)
+  to avoid namespace collisions.
+- `src/personalos/api/` — FastAPI app; `src/personalos/painel/` — the older Jinja panel;
+  `web/` — the React + Vite + TypeScript SPA, built into `src/personalos/web_dist/`.
+- `src/personalos/cli.py` — root CLI, aggregates the modules via `add_typer`.
+
+### Decisions worth more than the code
+
+The decisions that are expensive to reverse live in [`docs/adr/`](docs/adr/), each with context,
+rationale and a **review trigger**. Start with the [index](docs/adr/README.md). Some of them:
+
+| ADR | Decision |
+|---|---|
+| [0001](docs/adr/0001-sqlite-como-banco-unico.md) | SQLite as the only database |
+| [0002](docs/adr/0002-llm-nunca-calcula.md) | **The LLM never calculates** — every number comes from SQL or a pure function |
+| [0004](docs/adr/0004-convencao-de-sinal-nas-views.md) | A single sign convention in the views |
+| [0006](docs/adr/0006-composition-root-fora-do-kernel.md) | Composition root outside the kernel |
+| [0007](docs/adr/0007-painel-sem-javascript.md) | A panel without JavaScript — and why it was later replaced ([0008](docs/adr/0008-spa-react-substitui-painel-sem-js.md)) |
+| [0010](docs/adr/0010-superficie-de-ataque-do-painel-local.md) | **Attack surface of a password-less local panel** — includes an exploitable flaw found and fixed |
+
+### Triggers to revisit architecture decisions
+
+- **Alembic** ← first destructive schema migration that the mini-engine in `nucleo/migracoes.py` handles poorly.
+- **Postgres** ← a real need for a second concurrent writer process, or pgvector.
+- **EventBus** ← the first real publisher/subscriber pair between two different modules.
+- **YAML insight rules** ← when deterministic rules exceed ~10 (today: 3).
+- **FastAPI API + panel** ← trigger fired and DELIVERED (v0.2.2 and v0.2.3): the chosen interface was a
+  local web panel, so the API got a real consumer. The panel first shipped without HTMX or any JavaScript
+  (ADR 0007), later replaced by the React SPA (ADR 0008).
+
+## 📖 Usage in depth
+
+<details>
+<summary><strong>All CLI commands</strong></summary>
 
 ```bash
-cd ~/lab/personalos
-uv venv .venv && uv pip install --python .venv/bin/python -e .   # setup
-
-# módulo financeiro
+# finance module
 .venv/bin/personalos financas regra uber Transporte
 .venv/bin/personalos financas importar
 .venv/bin/personalos financas saldo
 .venv/bin/personalos financas gastos --mes 6 --ano 2026
 .venv/bin/personalos financas categorias --mes 6
-.venv/bin/personalos financas conta nubank "1.000,00"   # saldo inicial da conta
-.venv/bin/personalos financas fluxo                      # entradas/saídas por mês
-.venv/bin/personalos financas lancar "cafe" 7,00         # lançamento manual (dinheiro/PIX)
-.venv/bin/personalos financas inspecionar-pdf extrato.pdf   # layout do PDF, mascarado
-.venv/bin/personalos financas sugerir-regras            # onde está o dinheiro sem categoria
-.venv/bin/personalos financas recategorizar            # aplica as regras ao que já está gravado
+.venv/bin/personalos financas conta nubank "1.000,00"   # account opening balance
+.venv/bin/personalos financas fluxo                      # inflow/outflow per month
+.venv/bin/personalos financas lancar "cafe" 7,00         # manual entry (cash/PIX)
+.venv/bin/personalos financas inspecionar-pdf extrato.pdf   # PDF layout, masked
+.venv/bin/personalos financas sugerir-regras            # where the uncategorized money is
+.venv/bin/personalos financas recategorizar            # applies rules to what is already stored
 
-# perguntas de decisão (determinísticas, sem LLM)
-.venv/bin/personalos financas custo-basico              # fixos + mediana do variável
-.venv/bin/personalos financas onde-cortar --limite 5    # ranqueado por impacto ANUAL
+# decision questions (deterministic, no LLM)
+.venv/bin/personalos financas custo-basico              # fixed + median of variable
+.venv/bin/personalos financas onde-cortar --limite 5    # ranked by ANNUAL impact
 .venv/bin/personalos financas pode-comprar 4500 --parcelas 10 --parcela 500
-.venv/bin/personalos financas projecao                  # como o mês deve fechar
+.venv/bin/personalos financas projecao                  # how the month should close
 
-# gastos fixos aprendidos e alertas
-.venv/bin/personalos financas fixos                      # detecta e lista os fixos
-.venv/bin/personalos financas esquecer-fixo "deliveria pedido"  # tira um falso positivo
+# learned fixed expenses and alerts
+.venv/bin/personalos financas fixos                      # detects and lists fixed expenses
+.venv/bin/personalos financas esquecer-fixo "deliveria pedido"  # removes a false positive
 .venv/bin/personalos insights gerar
 .venv/bin/personalos insights listar
-.venv/bin/personalos insights dispensar 3                # não volta a aparecer
+.venv/bin/personalos insights dispensar 3                # will not come back
 .venv/bin/personalos memoria listar --tipo gasto_fixo
 
-# painel + API em http://127.0.0.1:8000 (só loopback)
+# UI + API at http://127.0.0.1:8000 (loopback only)
 .venv/bin/personalos servir
 
-# backup (já plugado na rotina noturna — ver Backup)
+# backup
 .venv/bin/personalos backup
 ```
 
-## Abrir sem terminal
+</details>
+
+<details>
+<summary><strong>Web UI and API</strong></summary>
+
+`personalos servir` runs the UI and the JSON API in the same process, on `127.0.0.1:8000`.
+Binding outside loopback is **refused with no escape hatch**.
+
+- `/app/` — the React SPA (import statements, fix balances, manual entries, batch categorization,
+  analysis, purchase simulator). See [ADR 0008](docs/adr/0008-spa-react-substitui-painel-sem-js.md).
+- `/` — the original Jinja panel, server-rendered SVG chart and plain HTML forms
+  ([ADR 0007](docs/adr/0007-painel-sem-javascript.md)); it stays during the transition to the SPA.
+- `/docs` — browsable API.
+
+Neither UI knows any module by name: panel cards come from the `card` field of the module manifest, and
+architecture tests fail the build if a module name appears in `painel/` or `web/src/shell/`.
+Writes over HTTP require a loopback `Host` and a matching `Origin`
+([ADR 0009](docs/adr/0009-escrita-http-e-verificacao-de-origem.md),
+[ADR 0010](docs/adr/0010-superficie-de-ataque-do-painel-local.md)).
+
+</details>
+
+<details>
+<summary><strong>Open without a terminal (systemd user service)</strong></summary>
 
 ```bash
 ./setup/instalar.sh
 ```
 
-Instala um serviço **de usuário** (nunca do sistema, nunca root) que sobe o
-PersonalOS no login, e um atalho no menu de aplicativos que abre
-`http://127.0.0.1:8000/app/`.
+Installs a **user** service (never a system one, never root) that starts PersonalOS at login, and an
+application-menu shortcut that opens `http://127.0.0.1:8000/app/`.
 
-O serviço roda com sandbox do systemd: disco somente leitura, com escrita
-liberada apenas em `~/.local/share/personalos`, sem escalada de privilégio. O
-bind continua travado em loopback pelo próprio programa.
+The service runs with the systemd sandbox: read-only disk, with writes allowed only in
+`~/.local/share/personalos`, no privilege escalation. The bind stays locked to loopback by the program itself.
 
-Diagnóstico quando algo falhar:
+Diagnostics when something fails:
 
 ```bash
 systemctl --user status personalos
 journalctl --user -u personalos -n 50
 ```
 
-Desfazer:
+Undo:
 
 ```bash
 systemctl --user disable --now personalos
 rm ~/.config/systemd/user/personalos.service ~/.local/share/applications/personalos.desktop
 ```
 
-`personalos servir` continua funcionando no terminal — é o caminho de
-recuperação quando a interface estiver quebrada.
+`personalos servir` keeps working in the terminal — it is the recovery path when the interface is broken.
 
-## Painel e API
+</details>
 
-`personalos servir` sobe painel e API JSON no mesmo processo, em `127.0.0.1:8000`.
-Bind fora de loopback é **recusado sem escape hatch**: não há autenticação, e expor
-publicaria seus dados financeiros na rede.
+<details>
+<summary><strong>Categorizing without dying of boredom</strong></summary>
 
-`/docs` traz a API navegável. O painel não conhece módulo nenhum — os cards vêm do
-campo `card` do manifesto, e há teste de arquitetura que falha o build se o nome de
-um módulo aparecer em `painel/`. Sem JavaScript: gráfico em SVG do servidor e
-formulário HTML puro (ADR 0007).
+After importing a year of statements everything starts uncategorized — and without categories
+`onde-cortar` only sees fixed expenses. `financas sugerir-regras` groups uncategorized transactions using
+the same normalization as fixed-expense detection and sorts by the **amount** each group represents, not by
+count: half a dozen rules cover most of the money.
 
-## Categorizar sem morrer de tédio
+The suggested pattern is the longest word common to every description in the group (between "PIX", "QRS"
+and "TELECOMIX", the last one is what identifies it). Ties are broken alphabetically — `max()` over a set is
+not deterministic, and a suggestion that changes between runs is worse than none. The reach column shows the
+effect of the rule **before** creating it.
 
-Depois de importar um ano de extrato, tudo nasce sem categoria — e sem categoria o
-`onde-cortar` só vê os gastos fixos. `financas sugerir-regras` agrupa as transações
-sem categoria pela mesma normalização que a detecção de gasto fixo usa e ordena
-pelo **valor** que cada grupo representa, não pela contagem: meia dúzia de regras
-cobre a maior parte do dinheiro.
+The category is always your choice; the tool only shows where the volume is.
 
-O padrão sugerido é a palavra mais longa comum a todas as descrições do grupo
-(entre "PIX", "QRS" e "TELECOMIX", a última é a que identifica). Empate resolve por
-ordem alfabética — `max()` sobre conjunto não é determinístico, e sugestão que muda
-entre execuções é pior que nenhuma. A coluna de alcance mostra o efeito da regra
-**antes** de criá-la.
+</details>
 
-A categoria é sempre escolha sua; a ferramenta só mostra onde está o volume.
+<details>
+<summary><strong>PDF statements</strong></summary>
 
-## Extrato em PDF
+`financas importar` accepts PDF, with two guards against silent failure — the typical failure mode of the
+format: no line with a date and an amount may be skipped without classification, and the extracted sum is
+reconciled against the balances declared in the statement itself, matched by date. If it does not close,
+the file is rejected.
 
-`financas importar` aceita PDF, com duas guardas contra falha silenciosa — que é o
-modo de falhar típico do formato: nenhuma linha com data e valor pode ser ignorada
-sem classificação, e a soma extraída é reconciliada contra os saldos declarados no
-próprio extrato, casando por data. Se não fechar, o arquivo é recusado.
+"Saldo do dia" (daily balance) lines are excluded: in the real statements tested they were ~30% of the
+candidate lines, and importing them would create dozens of phantom transactions.
 
-Linhas de "Saldo do dia" são excluídas: nos extratos reais testados eram ~30% das
-linhas candidatas, e importá-las criaria dezenas de transações fantasmas.
+`financas inspecionar-pdf` shows the structure of a statement with everything **masked** (letter → `a`,
+digit → `9`), to calibrate the reader for a new bank without exposing content. The output is safe to share;
+the only residual leak is the number of digits, i.e. the order of magnitude of the amounts.
 
-`financas inspecionar-pdf` mostra a estrutura de um extrato com tudo **mascarado**
-(letra → `a`, dígito → `9`), para calibrar o leitor de um banco novo sem expor
-conteúdo. A saída é segura para compartilhar; o único vazamento residual é a
-quantidade de dígitos, ou seja a ordem de grandeza dos valores.
+</details>
 
-## Perguntas de decisão
+<details>
+<summary><strong>Decision questions and method choices</strong></summary>
 
-`custo-basico`, `onde-cortar`, `pode-comprar` e `projecao` são funções puras em
-`aplicacao/analise.py` — são as ferramentas que o agente conversacional chama.
-O LLM escolhe qual chamar e narra; nenhum número sai dele.
+`custo-basico`, `onde-cortar`, `pode-comprar` and `projecao` are pure functions in `aplicacao/analise.py` —
+they are the tools a conversational agent is meant to call. The LLM would choose which one to call and narrate;
+no number comes from it.
 
-Escolhas de método, por que importam:
-- **Mediana, não média**, em todo agregado mensal: um mês atípico não deve virar
-  o seu "normal".
-- **Mês corrente excluído** das medianas: um mês pela metade puxaria tudo para baixo.
-- **`numpy-financial`** para dinheiro parcelado: `rate` recupera o juro embutido em
-  "10x de R$ 500" (é assim que se descobre que o "sem juros" tem 1,96%/mês) e `pmt`
-  calcula a parcela a partir de uma taxa. Amortização e taxa efetiva à mão erram fácil.
-- **Projeção só acelera o gasto variável** pelo ritmo de dias; gasto fixo não se
-  multiplica com o calendário, e o que ainda não caiu entra como pendente.
-- **Anomalia por z-score modificado** (mediana + MAD, corte 3,5 — Iglewicz-Hoaglin),
-  com queda para um limiar relativo quando o MAD é zero. Média e desvio padrão são
-  contaminados justamente pelo mês que se quer detectar.
-- `pode-comprar` **não dá veredito**: devolve parcela, juro, folga e meses de
-  reserva. A decisão é sua.
+Method choices, and why they matter:
+- **Median, not mean**, in every monthly aggregate: an atypical month should not become your "normal".
+- **Current month excluded** from medians: a half month would pull everything down.
+- **`numpy-financial`** for installment money: `rate` recovers the interest embedded in "10x R$ 500" (that is
+  how you find out that "interest-free" has 1.96%/month) and `pmt` computes the installment from a rate.
+  Amortization and effective rate by hand are easy to get wrong.
+- **The projection only accelerates variable spending** by the pace of days; fixed expenses do not multiply
+  with the calendar, and what has not been charged yet enters as pending.
+- **Anomaly by modified z-score** (median + MAD, cutoff 3.5 — Iglewicz-Hoaglin), falling back to a relative
+  threshold when MAD is zero. Mean and standard deviation are contaminated by the very month you want to detect.
+- `pode-comprar` **gives no verdict**: it returns installment, interest, slack and months of reserve.
+  The decision is yours.
 
-## Gastos fixos e insights
+</details>
 
-`financas fixos` aprende do histórico: agrupa as despesas por descrição
-normalizada (sem os dígitos onde o banco escreve data e parcela) e aceita como
-fixo o que aparece em ≥3 meses, com valor estável (maioria a ±25% da mediana) e
-atividade recente. O resultado fica em `nucleo_memoria`, então reaprender
-atualiza em vez de duplicar, e uma correção sua sobrevive.
+<details>
+<summary><strong>Fixed expenses and insights</strong></summary>
 
-Nada disso usa LLM: todo número vem de SQL/Python.
+`financas fixos` learns from history: it groups expenses by normalized description (without the digits
+where the bank writes date and installment) and accepts as fixed what appears in ≥3 months, with a stable
+amount (majority within ±25% of the median) and recent activity. The result is stored in `nucleo_memoria`,
+so re-learning updates instead of duplicating, and your corrections survive.
 
-Regras atuais: gasto fixo que não apareceu no último mês com movimento (e que
-para de avisar quando a ausência deixa de ser recente, senão uma assinatura
-cancelada incomodaria pra sempre); gasto fixo que subiu mais de 10% da mediana;
-categoria fora do normal pelo z-score modificado. Um insight dispensado não volta
-(dedup por `regra_id + chave_dedup`).
+None of this uses an LLM: every number comes from SQL/Python.
 
-Um gasto mensal recorrente e mais ou menos estável (delivery, por exemplo) pode
-ser classificado como fixo — é o critério funcionando, não um bug. Use
-`esquecer-fixo` para removê-lo.
+Current rules: a fixed expense that did not appear in the last month with activity (and that stops warning
+when the absence is no longer recent, otherwise a cancelled subscription would nag forever); a fixed
+expense that rose more than 10% over its median; a category out of the ordinary by the modified z-score.
+A dismissed insight does not come back (dedup by `regra_id + chave_dedup`).
 
-## Backup
+A recurring and roughly stable monthly expense (delivery, for example) may be classified as fixed — that
+is the criterion working, not a bug. Use `esquecer-fixo` to remove it.
 
-`personalos backup` cria uma cópia consistente do banco em
-`~/.local/share/personalos/backups/personalos-<timestamp>.db` via API nativa de
-backup do SQLite (segura mesmo com o banco em uso).
+</details>
 
-**Automatizado:** `~/lab/noite/modules/01-backup.sh` chama este comando antes de
-disparar o restic, então o snapshot consistente entra no backup do sistema (o
-restic sozinho copiaria o arquivo em uso, o que não é seguro com WAL). Mantém os
-7 snapshots locais mais recentes; o histórico longo é do restic. Não existe timer
-próprio do PersonalOS por design — um agendador já existia.
+<details>
+<summary><strong>Backup</strong></summary>
 
-Restaurar = copiar o arquivo de backup de volta pro caminho do banco (`~/.local/share/personalos/personalos.db`).
-Os extratos brutos originais em `extratos/` são a fonte de reimportação idempotente
-(dedup por `fit_id`) — guarde-os como disaster recovery adicional.
+`personalos backup` creates a consistent copy of the database at
+`~/.local/share/personalos/backups/personalos-<timestamp>.db` using SQLite's native backup API (safe even
+while the database is in use).
 
-## Dashboard (Metabase, opcional)
+There is no PersonalOS timer by design — call it from the scheduler you already have. In the author's
+setup, a nightly script runs `personalos backup` before restic, so the consistent snapshot goes into the
+system backup (restic alone would copy the file in use, which is not safe with WAL); it keeps the 7 most
+recent local snapshots and restic holds the long history.
 
-O Metabase é uma ferramenta de visualização opcional — não é obrigatório pro
-PersonalOS funcionar. Ele lê as views (`vw_financas_*_v1`) do banco real, em
-modo somente leitura.
+Restore = copy the backup file back to the database path (`~/.local/share/personalos/personalos.db`).
+The original raw statements in `extratos/` are the source for idempotent re-import (dedup by `fit_id`) —
+keep them as additional disaster recovery.
+
+</details>
+
+<details>
+<summary><strong>Dashboard with Metabase (optional)</strong></summary>
+
+Metabase is an optional visualization tool — PersonalOS does not need it. It reads the views
+(`vw_financas_*_v1`) of the real database, read-only.
 
 ```bash
 docker compose --profile metabase up -d
 ```
 
-Depois abra `http://localhost:3000`, complete o setup inicial, e adicione uma
-conexão de banco de dados apontando pro arquivo montado em `/data/personalos.db`
-(tipo SQLite). Isso é feito uma vez só, pela UI — não é automatizado por design
-(ferramenta pessoal, uso único).
+Then open `http://localhost:3000` (bound to loopback only), complete the initial setup, and add a database
+connection pointing to the file mounted at `/data/personalos.db` (type SQLite). This is done once, in the
+UI — not automated by design (personal tool, one-time use).
 
-## Decisões de arquitetura
+</details>
 
-As decisões caras de reverter estão em [`docs/adr/`](docs/adr/) — cada uma com
-contexto, justificativa e **gatilho de revisão**. Comece pelo
-[índice](docs/adr/README.md).
+## 📌 Project status & limitations
 
-## Arquitetura
+- Version **0.2.4**, single-user, maintained by one person; Linux is the only setup with an installer
+  (`setup/` uses systemd user units).
+- **No authentication by design**: it only binds to loopback. Read
+  [ADR 0010](docs/adr/0010-superficie-de-ataque-do-painel-local.md) before changing anything network-related.
+- **Conversational chat is not shipped**: the contract (`nucleo/portas/chat.py`) and `POST /api/chat` exist,
+  but `personalos servir` starts without a chat service, so the endpoint answers `501 Not Implemented`.
+- Bank coverage is limited to what was tested: CSV header mappings live in
+  `modulos/financas/infra/leitores/csv_.py`; PDF layouts vary per bank, and a new bank should be calibrated
+  first with `inspecionar-pdf`.
+- A recurring, stable variable expense (e.g. delivery) may be detected as fixed — use `esquecer-fixo`.
+- Two UIs coexist during the transition (`/` Jinja, `/app/` SPA), and `node_modules` is the one part of
+  the system that needs continuous maintenance (accepted cost, ADR 0008).
 
-- `src/personalos/nucleo/` — kernel: config XDG, engine compartilhada (SQLite+WAL),
-  transação de escrita (`BEGIN IMMEDIATE`), migrações idempotentes, contrato de módulo
-  (`Modulo`, dataclass), memória (`nucleo_memoria`) e motor de insights
-  (`nucleo_insights`). **Não importa módulo nenhum** — ver ADR 0006.
-- `src/personalos/composicao.py` — composition root: a lista estática de módulos
-  plugados. É a única camada que conhece todos eles.
-- `src/personalos/modulos/<nome>/` — cada módulo é um pacote independente
-  (Clean Architecture: dominio/aplicacao/infra + cli.py + modulo.py de manifesto).
-  Tabelas prefixadas por módulo (`financas_*`) evitam colisão de namespace.
-- `src/personalos/cli.py` — CLI raiz, agrega os módulos via `add_typer`.
+## 🗺️ Roadmap
 
-## Gatilhos para revisitar decisões de arquitetura
+1. **Retire the Jinja panel** and serve the SPA at the root, as planned in ADR 0008 (the SPA uses
+   `base: '/app/'` only while the panel occupies `/`).
+2. **Conversational consultant** implementing `ServicoChat` over the local Ollama HTTP API, calling the
+   deterministic functions in `aplicacao/analise.py` — no agent framework (ADR 0002, ADR 0003).
+3. **More bank layouts**: new CSV mappings and PDF calibration via `inspecionar-pdf`.
+4. **More deterministic insight rules** (3 today); move them to YAML once they pass ~10, per the trigger above.
+5. **Adopt `ruff format`** across the code base (`ruff check` already passes; formatting is not yet applied
+   to most files).
 
-- **Alembic** ← primeira migração destrutiva de schema desconfortável pro mini-mecanismo em `nucleo/migracoes.py`.
-- **Postgres** ← necessidade real de 2º processo escritor concorrente, ou pgvector.
-- **EventBus** ← primeiro par publicador/assinante real entre dois módulos distintos.
-- **YAML de regras de insight** ← quando as regras determinísticas passarem de ~10 (hoje: 3).
-- **API FastAPI + painel** ← gatilho disparado e ENTREGUE (v0.2.2 e v0.2.3): a interface
-  escolhida foi um painel web local, então a API ganhou consumidor real. O painel saiu
-  sem HTMX e sem JavaScript nenhum — ver ADR 0007.
-- **Dashboard SPA (SolidJS)** ← dores documentadas de verdade com o painel atual, não antecipação.
+## 🤝 Contributing
 
-## Testes
+Issues and PRs are welcome — tests, bank formats, docs and UI polish especially.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions and a list of good first issues.
 
-`.venv/bin/pytest`
+## 📄 License
+
+MIT — see [`LICENSE`](LICENSE).
