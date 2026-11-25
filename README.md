@@ -2,7 +2,7 @@
 
 # fAInance
 
-**Local, deterministic personal finance.** It reads your bank statements, learns your fixed expenses
+**Local, deterministic personal finance** — Python package and CLI **`personalos`**. It reads your bank statements, learns your fixed expenses
 on its own and answers decision questions — no data leaves your machine and no number comes from a
 language model.
 

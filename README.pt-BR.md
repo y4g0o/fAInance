@@ -2,7 +2,7 @@
 
 # fAInance
 
-**Sistema financeiro pessoal, local e determinístico.** Lê os extratos do seu banco, aprende os gastos
+**Sistema financeiro pessoal, local e determinístico** — pacote Python e CLI **`personalos`**. Lê os extratos do seu banco, aprende os gastos
 fixos sozinho e responde perguntas de decisão — sem que nenhum dado saia da sua máquina e sem que nenhum
 número venha de um modelo de linguagem.
 
