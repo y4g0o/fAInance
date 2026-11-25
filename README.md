@@ -51,6 +51,7 @@ Requirements: Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/). Node.js only
 git clone https://github.com/y4g0o/fAInance.git
 cd fAInance
 uv venv .venv && uv pip install --python .venv/bin/python -e .
+.venv/bin/personalos financas demo # optional: synthetic data to explore (empty database only)
 .venv/bin/personalos servir        # web UI and API at http://127.0.0.1:8000/app/
 ```
 

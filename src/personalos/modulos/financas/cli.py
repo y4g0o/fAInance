@@ -1,6 +1,7 @@
 """CLI do módulo financas (Typer). Toda lógica vem dos casos de uso."""
 from __future__ import annotations
 
+import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 from typing import cast
@@ -14,6 +15,7 @@ from personalos.modulos.financas.aplicacao import analise, consultas, escrita, s
 from personalos.modulos.financas.aplicacao.importar import importar_extratos
 from personalos.modulos.financas.dominio.dinheiro import Dinheiro
 from personalos.modulos.financas import insights as insights_financas
+from personalos.modulos.financas.infra import demo as dados_demo
 from personalos.modulos.financas.infra.leitores import detectar_leitor
 from personalos.modulos.financas.infra.leitores import pdf as leitor_pdf
 from personalos.modulos.financas.infra.repositorios import (
@@ -477,6 +479,44 @@ def conta(
         typer.echo(f"Erro: {e}")
         raise typer.Exit(1) from e
     typer.echo(f"Conta '{nome}': saldo inicial definido em {valor.formatar()}")
+
+
+@app.command()
+def demo(db: Path | None = typer.Option(None, "--db")) -> None:
+    """Carrega dados SINTÉTICOS para conhecer a interface (só em banco vazio).
+
+    Gera um extrato CSV fictício dos últimos meses e o importa pelo caminho real
+    (leitor, dedup, regras, gastos fixos e insights). Recusa banco que já tem
+    transações: misturar dado inventado com o seu estragaria os dois.
+    """
+    db_resolvido = db or caminho_banco()
+    engine = _engine_financas(db_resolvido)
+    with engine.connect() as conn:
+        existentes = conn.execute(text("SELECT COUNT(*) FROM financas_transacoes")).scalar_one()
+    if existentes:
+        typer.echo(
+            f"O banco {db_resolvido} já tem {existentes} transação(ões) — a demo só "
+            "carrega num banco vazio. Use um banco separado:\n"
+            "  personalos financas demo --db /tmp/demo.db\n"
+            "  personalos servir --db /tmp/demo.db"
+        )
+        raise typer.Exit(1)
+
+    repo_tx, repo_regras = _repos(db_resolvido)
+    for r in dados_demo.REGRAS_DEMO:
+        repo_regras.adicionar(r)
+    with tempfile.TemporaryDirectory() as pasta:
+        extrato = dados_demo.escrever_extrato_demo(Path(pasta), date.today())
+        novas = importar_extratos([str(extrato)], repo_tx, repo_regras, detectar_leitor)
+    # O saldo só soma contas declaradas; sem isto a tela abriria com R$ 0,00.
+    RepoContasSQL(engine).definir_saldo_inicial(
+        dados_demo.CONTA_DEMO, Dinheiro(dados_demo.SALDO_INICIAL_CENTAVOS)
+    )
+    novos = escrita.reprocessar_insights(engine)
+    typer.echo(f"Demo carregada em {db_resolvido}: {novas} transações sintéticas, "
+               f"{novos} insight(s).")
+    sufixo = f" --db {db}" if db else ""
+    typer.echo(f"Abra a interface com:  personalos servir{sufixo}")
 
 
 if __name__ == "__main__":
