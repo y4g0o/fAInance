@@ -142,6 +142,7 @@ de revisão**. Comece pelo [índice](docs/adr/README.md). Algumas:
 ```bash
 # módulo financeiro
 .venv/bin/personalos financas regra uber Transporte
+.venv/bin/personalos financas demo                       # dados sintéticos para explorar (só com banco vazio)
 .venv/bin/personalos financas importar
 .venv/bin/personalos financas saldo
 .venv/bin/personalos financas gastos --mes 6 --ano 2026

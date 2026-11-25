@@ -143,6 +143,7 @@ rationale and a **review trigger**. Start with the [index](docs/adr/README.md). 
 ```bash
 # finance module
 .venv/bin/personalos financas regra uber Transporte
+.venv/bin/personalos financas demo                       # synthetic data to explore (empty database only)
 .venv/bin/personalos financas importar
 .venv/bin/personalos financas saldo
 .venv/bin/personalos financas gastos --mes 6 --ano 2026
