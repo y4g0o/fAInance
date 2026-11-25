@@ -8,7 +8,7 @@ número venha de um modelo de linguagem.
 
 [![Licença: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
-[![Testes: pytest + vitest](https://img.shields.io/badge/tests-pytest%20%2B%20vitest-green.svg)](tests/)
+[![CI](https://github.com/y4g0o/fAInance/actions/workflows/ci.yml/badge.svg)](https://github.com/y4g0o/fAInance/actions/workflows/ci.yml)
 
 ![Tela de categorização em lote](docs/imagens/categorizar.png)
 
