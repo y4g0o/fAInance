@@ -41,6 +41,14 @@ três, com números rastreáveis até a função que os produziu.
   visível. Sem precedente, não sugere: campo vazio é melhor que palpite.
 - **Simula a compra parcelada** e mostra o juro que o "sem juros" esconde.
 
+## 📸 Capturas de tela
+
+Dados sintéticos de `personalos financas demo`.
+
+![Resumo: custo básico de vida e projeção do mês](docs/imagens/resumo.png)
+
+![Simulador de parcelamento: juro embutido, folga mensal e reserva](docs/imagens/posso-comprar.png)
+
 ## 🚀 Início rápido
 
 Requisitos: Python ≥ 3.12 e [uv](https://docs.astral.sh/uv/). Node.js só se for mexer na interface web

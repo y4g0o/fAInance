@@ -42,6 +42,14 @@ answers those three, with numbers traceable to the function that produced them.
   shown. Without precedent it suggests nothing: an empty field beats a guess.
 - **Simulates installment purchases** and shows the interest that "interest-free" hides.
 
+## 📸 Screenshots
+
+Synthetic data from `personalos financas demo`.
+
+![Summary: basic cost of living and month-end projection](docs/imagens/resumo.png)
+
+![Installment simulator: hidden interest, monthly slack and reserve](docs/imagens/posso-comprar.png)
+
 ## 🚀 Quickstart
 
 Requirements: Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/). Node.js only if you work on the web UI
